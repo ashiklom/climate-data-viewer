@@ -10,40 +10,49 @@ export { sources };
 export type Sources = typeof sources;
 export type DatasetName = keyof Sources["datasets"];
 
-// numcodecs.fixedscaleoffset (NASA POWER): stored = round((x - offset) * scale) as `astype`; decode = stored / scale + offset.
-class FixedScaleOffset {
-  kind = "array_to_array" as const;
-  #scale: number;
-  #offset: number;
-  constructor(config: { scale: number; offset: number }) {
-    this.#scale = config.scale;
-    this.#offset = config.offset;
-  }
-  static fromConfig(config: { scale: number; offset: number }) {
-    return new FixedScaleOffset(config);
-  }
-  encode(): never {
-    throw new Error("fixedscaleoffset: encode not supported");
-  }
-  decode(chunk: zarr.Chunk<zarr.DataType>) {
-    const src = chunk.data as Float32Array;
-    const out = new Float32Array(src.length);
-    for (let i = 0; i < src.length; i++) out[i] = src[i]! / this.#scale + this.#offset;
-    return { ...chunk, data: out };
-  }
+// zarrita translates v2 numcodecs `fixedscaleoffset` filters (NASA POWER) into the v3 `scale_offset` codec, but its
+// decode computes in float64. The scale_offset spec (and numcodecs) evaluate in the array's data type, i.e. float32:
+//   dec = float32(float32(enc / scale) + offset)
+// With POWER's offset of 1000 the difference is up to ~6e-5. This override is spec-conformant for float32 and defers
+// to zarrita's codec for other types, so the site matches Python readers bit-for-bit.
+type CodecFactory = { fromConfig(config: { scale?: number; offset?: number }, meta: { dataType: string }): unknown };
+
+function scaleOffsetFloat32Aware(original: () => Promise<unknown>) {
+  return async () => {
+    const base = (await original()) as CodecFactory;
+    return {
+      fromConfig(config: { scale?: number; offset?: number }, meta: { dataType: string }) {
+        if (meta.dataType !== "float32") return base.fromConfig(config, meta);
+        const scale = Math.fround(config.scale ?? 1), offset = Math.fround(config.offset ?? 0);
+        return {
+          kind: "array_to_array" as const,
+          encode(): never {
+            throw new Error("scale_offset: encode not supported");
+          },
+          decode(chunk: zarr.Chunk<"float32">) {
+            const src = chunk.data, out = new Float32Array(src.length), f = Math.fround;
+            for (let i = 0; i < src.length; i++) out[i] = f(f(src[i]! / scale) + offset);
+            return { ...chunk, data: out };
+          },
+        };
+      },
+    };
+  };
 }
 
 let registered = false;
-export function registerCodecs() {
+/** Register custom codecs once. In Node (tests), pass the pcodec .wasm bytes. */
+export function registerCodecs(options: { pcodecWasm?: BufferSource } = {}) {
   if (registered) return;
   registered = true;
-  registerPcodec();
-  zarr.registry.set("fixedscaleoffset", async () => FixedScaleOffset as never);
+  registerPcodec(options.pcodecWasm ? { wasm: options.pcodecWasm } : {});
+  const original = zarr.registry.get("scale_offset")!; // capture zarrita's codec before overriding
+  zarr.registry.set("scale_offset", scaleOffsetFloat32Aware(original) as never);
 }
 
 const icechunkCache = new Map<string, Promise<IcechunkStore>>();
 export function openIcechunk(url: string): Promise<IcechunkStore> {
-  const abs = new URL(url, location.href).href;
+  const abs = new URL(url, typeof location === "undefined" ? undefined : location.href).href;
   if (!icechunkCache.has(abs)) icechunkCache.set(abs, IcechunkStore.open(abs, { branch: "main" }));
   return icechunkCache.get(abs)!;
 }
