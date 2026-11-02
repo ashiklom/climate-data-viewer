@@ -88,7 +88,7 @@ def init_daily_group(
             fill_value=np.nan, dimension_names=["time", "lat", "lon"], attributes=a,
             config={"write_empty_chunks": False}, **codec_kwargs(codec, 4),
         )
-    session.commit(f"{path}: daily axis {start}..{end}, empty {', '.join(variables)}")
+    session.commit(f"{path}: daily axis {start}..{end}, empty {', '.join(variables)}", rebase_with=icechunk.ConflictDetector())
 
 
 def write_days(repo: icechunk.Repository, path: str, values: dict[str, xr.DataArray], message: str) -> None:
@@ -99,4 +99,5 @@ def write_days(repo: icechunk.Repository, path: str, values: dict[str, xr.DataAr
     for name, da in values.items():
         i0 = (pd.Timestamp(da.time.values[0]) - t0).days
         group[name][i0 : i0 + da.sizes["time"]] = da.transpose("time", "lat", "lon").values.astype(np.float32)
-    session.commit(message)
+    # Other writers may commit to other groups of the same repo meanwhile; rebase unless there is a real conflict.
+    session.commit(message, rebase_with=icechunk.ConflictDetector())
