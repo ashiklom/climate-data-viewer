@@ -34,6 +34,20 @@ def regrid(ds: xr.Dataset) -> xr.Dataset:
     return out.astype(np.float32)
 
 
+def load_with_retry(name: str, d0: dt.date, d1: dt.date, attempts: int = 5) -> xr.Dataset:
+    """Remote sources (NASA POWER, S3) occasionally drop connections; retry with backoff."""
+    for i in range(attempts):
+        try:
+            return open_daily(name, d0, d1).load()
+        except Exception as e:  # network errors surface as many exception types (aiohttp, OSError, ...)
+            if i == attempts - 1:
+                raise
+            wait = 30 * 2**i
+            print(f"  {name} {d0}..{d1}: {type(e).__name__}: {str(e)[:120]}; retrying in {wait}s", flush=True)
+            time.sleep(wait)
+    raise AssertionError("unreachable")
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--dataset", choices=DATASETS, required=True)
@@ -57,7 +71,7 @@ def main() -> None:
         d0 = w0.date()
         d1 = min(d0 + dt.timedelta(days=WINDOW_DAYS - 1), args.end)
         t0 = time.time()
-        src = open_daily(args.dataset, d0, d1).load()
+        src = load_with_retry(args.dataset, d0, d1)
         out = regrid(src)
         write_days(repo, GROUP, {v: out[v] for v in variables}, f"{GROUP}: {d0}..{d1}")
         print(f"{args.dataset} {d0}..{d1}: {src.sizes['time']} days in {time.time() - t0:.0f}s", flush=True)
