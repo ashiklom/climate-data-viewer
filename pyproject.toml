@@ -23,6 +23,7 @@ dependencies = [
     "rioxarray>=0.24.0",
     "tqdm>=4.70.1",
     "xarray>=2026.9.0",
+    "xarray-regrid>=0.4.2",
     "zarr>=3",
 ]
 
