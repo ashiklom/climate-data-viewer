@@ -1,4 +1,6 @@
-"""Harmonized CF integer packing (scale_factor / add_offset) of PRISM float32 grids.
+"""Harmonized CF integer packing (scale_factor / add_offset) of float32 grids of decimal values.
+
+Written for PRISM (described below) and reused for other datasets with decimal-valued data.
 
 Almost all PRISM values are exact decimal quantities (3 decimals, a few tmin grids 4), but
 individual grids were written to float32 in different ways:
@@ -19,20 +21,21 @@ import numpy as np
 import xarray as xr
 from xarray.conventions import decode_cf_variable
 
-from prism_mirror.catalog import VARIABLES
-
 DECIMALS = 4
 SCALE = 10.0**-DECIMALS
 
 
-def cf_attrs(var: str, kind: str = "cf-uint") -> tuple[np.dtype, dict]:
-    """Integer dtype and CF packing attributes for a variable (identical for every grid)."""
+ValidRange = tuple[float, float]
+
+
+def cf_attrs(valid_range: ValidRange, kind: str = "cf-uint") -> tuple[np.dtype, dict]:
+    """Integer dtype and CF packing attributes for a variable with the given plausible range."""
     if kind == "cf-int32":
         dtype = np.dtype(np.int32)
         return dtype, {"scale_factor": SCALE, "_FillValue": dtype.type(np.iinfo(dtype).min)}
     if kind != "cf-uint":
         raise ValueError(kind)
-    lo, hi = VARIABLES[var].valid_range
+    lo, hi = valid_range
     span = round((hi - lo) / SCALE)
     dtype = np.dtype(np.uint16 if span < np.iinfo(np.uint16).max else np.uint32)
     attrs = {"scale_factor": SCALE, "_FillValue": dtype.type(np.iinfo(dtype).max)}
@@ -41,8 +44,8 @@ def cf_attrs(var: str, kind: str = "cf-uint") -> tuple[np.dtype, dict]:
     return dtype, attrs
 
 
-def encode(data: np.ndarray, var: str, kind: str = "cf-uint") -> np.ndarray:
-    dtype, attrs = cf_attrs(var, kind)
+def encode(data: np.ndarray, valid_range: ValidRange, kind: str = "cf-uint") -> np.ndarray:
+    dtype, attrs = cf_attrs(valid_range, kind)
     nan = np.isnan(data)
     k = np.rint((data.astype(np.float64) - attrs.get("add_offset", 0.0)) / SCALE)
     k[nan] = attrs["_FillValue"]
@@ -55,29 +58,29 @@ def decode(ints: np.ndarray, attrs: dict) -> np.ndarray:
     return out.astype(np.float32)
 
 
-def canonical(data: np.ndarray, var: str = "ppt", kind: str = "cf-uint") -> np.ndarray:
+def canonical(data: np.ndarray, valid_range: ValidRange, kind: str = "cf-uint") -> np.ndarray:
     """The harmonized float32 values a reader of the mirror sees for `data`."""
-    return decode(encode(data, var, kind), cf_attrs(var, kind)[1])
+    return decode(encode(data, valid_range, kind), cf_attrs(valid_range, kind)[1])
 
 
-def pack(data: np.ndarray, var: str, kind: str = "cf-uint") -> tuple[np.ndarray, dict]:
+def pack(data: np.ndarray, valid_range: ValidRange, kind: str = "cf-uint", label: str = "") -> tuple[np.ndarray, dict]:
     """Encode float32 `data` (NaN = missing) to integers.
 
     Guarantees |decoded - data| <= SCALE / 2 + 1 ulp: decimal values move by at most float32 noise,
     unrounded values are rounded to the nearest SCALE.
     """
-    _, attrs = cf_attrs(var, kind)
-    ints = encode(data, var, kind)
+    _, attrs = cf_attrs(valid_range, kind)
+    ints = encode(data, valid_range, kind)
     back = decode(ints, attrs)
     nan = np.isnan(data)
     if not np.array_equal(nan, np.isnan(back)):
-        raise ValueError(f"{var}: missing-value mask changed by packing")
+        raise ValueError(f"{label}: missing-value mask changed by packing")
     src, out = data[~nan], back[~nan]
     ulp = np.abs(np.spacing(src)).astype(np.float64)
     excess = np.abs(out.astype(np.float64) - src) - (SCALE / 2 + ulp)
     if excess.size and excess.max() > 0:
         i = int(np.argmax(excess))
-        raise ValueError(f"{var}: packing would move {src[i]!r} to {out[i]!r} (> {SCALE / 2:g} + 1 ulp)")
+        raise ValueError(f"{label}: packing would move {src[i]!r} to {out[i]!r} (> {SCALE / 2:g} + 1 ulp)")
     return ints, attrs
 
 

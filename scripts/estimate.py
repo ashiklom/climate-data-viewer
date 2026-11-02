@@ -1,30 +1,22 @@
-"""Extrapolate the sample measurements to a full PRISM 800m daily + monthly Icechunk mirror.
+"""Extrapolate sample measurements to a full mirror of a dataset (--dataset) in Icechunk.
 
-Inputs: results/compression.csv (from compression_experiments.py) and the built subset store
-(for Icechunk metadata overhead and a cross-check of chunk bytes).
-Outputs: results/storage_estimate.csv (every codec) and results/storage_summary.csv (headline).
+Inputs: results/<dataset>/compression.csv (from compression_experiments.py) and, if given, a
+built store (for Icechunk metadata overhead per chunk object).
+Outputs: results/<dataset>/storage_estimate.csv (per codec x frequency x variable) and
+results/<dataset>/storage_summary.csv (per codec totals).
 """
 
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
-from prism_mirror.catalog import FREQUENCIES, NX, NY, RESULTS_DIR, VARIABLES
+from climate_mirror import datasets
 
-# Last grids listed on data.prism.oregonstate.edu at the time of the estimate (2026-11-02).
-RECORD_END = {"daily": dt.date(2026, 11, 1), "monthly": dt.date(2026, 10, 1)}
-ANNUAL_YEARS = 2025 - 1895 + 1
 TB = 1e12
-
-
-def n_steps(fname: str) -> int:
-    return len(FREQUENCIES[fname].dates(RECORD_END[fname]))
 
 
 def dir_bytes(path: Path) -> int:
@@ -33,8 +25,7 @@ def dir_bytes(path: Path) -> int:
 
 def store_overhead(store: Path) -> dict:
     """Icechunk metadata bytes (manifests, snapshots, transactions, refs) per stored chunk object."""
-    chunk_dir = store / "chunks"
-    chunk_files = [f for f in chunk_dir.rglob("*") if f.is_file()]
+    chunk_files = [f for f in (store / "chunks").rglob("*") if f.is_file()]
     chunk_bytes = sum(f.stat().st_size for f in chunk_files)
     meta_bytes = dir_bytes(store) - chunk_bytes
     return {
@@ -47,69 +38,65 @@ def store_overhead(store: Path) -> dict:
 
 def main() -> None:
     p = argparse.ArgumentParser()
+    p.add_argument("--dataset", choices=list(datasets.DATASETS), default="prism")
     p.add_argument("--codec", default="cf-uint+pcodec8", help="headline codec")
-    p.add_argument("--store", default=str(Path(__file__).resolve().parents[1] / "data" / "prism_subset.icechunk"))
+    p.add_argument("--store", help="built Icechunk store, for metadata overhead")
     args = p.parse_args()
+    ds = datasets.get(args.dataset)
+    ny, nx = ds.grid_shape
+    freqs = list(ds.frequencies)
+    steps = {f: ds.frequencies[f].n_steps(ds.record_end[f]) for f in freqs}
 
-    df = pd.read_csv(RESULTS_DIR / "compression.csv")
-    df = df[df.layout == df.freq.map({f: f"{F.time_chunk}x{F.space_chunk}x{F.space_chunk}" for f, F in FREQUENCIES.items()})]
-
-    overhead = store_overhead(Path(args.store)) if Path(args.store).exists() else None
+    df = pd.read_csv(ds.results_dir / "compression.csv")
+    df = df[df.layout == df.freq.map({f: datasets.default_layout(F) for f, F in ds.frequencies.items()})]
+    overhead = store_overhead(Path(args.store)) if args.store and Path(args.store).exists() else None
     meta_per_chunk = overhead["metadata_bytes_per_chunk"] if overhead else 0.0
 
     rows = []
     for (codec, fname, var), g in df.groupby(["codec", "freq", "var"]):
-        F = FREQUENCIES[fname]
-        steps = n_steps(fname)
+        n = steps[fname]
         per_step = g.stored_bytes / g.n_time  # one value per sampled block
-        objects_per_step = g.n_objects / g.n_time
         rows.append({
-            "codec": codec, "freq": fname, "var": var, "n_blocks": len(g), "n_steps": steps,
-            "est_bytes": per_step.mean() * steps,
-            "est_bytes_min": per_step.min() * steps,
-            "est_bytes_max": per_step.max() * steps,
-            "est_chunk_objects": objects_per_step.mean() * steps,
-            "raw_float32_bytes": NX * NY * 4 * steps,
-            "source_zip_bytes": (g.zip_bytes / g.n_time).mean() * steps,
-            "ratio_vs_raw": (g.raw_bytes.sum() / g.stored_bytes.sum()),
+            "codec": codec, "freq": fname, "var": var, "n_blocks": len(g), "n_steps": n,
+            "est_bytes": per_step.mean() * n,
+            "est_bytes_min": per_step.min() * n,
+            "est_bytes_max": per_step.max() * n,
+            "est_chunk_objects": (g.n_objects / g.n_time).mean() * n,
+            "raw_float32_bytes": nx * ny * 4 * n,
+            "source_bytes": (g.zip_bytes / g.n_time).mean() * n,
+            "ratio_vs_raw": g.raw_bytes.sum() / g.stored_bytes.sum(),
             "encode_MBps": g.raw_bytes.sum() / g.encode_s.sum() / 1e6,
             "decode_MBps": g.raw_bytes.sum() / g.decode_s.sum() / 1e6,
         })
     est = pd.DataFrame(rows)
     est["est_metadata_bytes"] = est.est_chunk_objects * meta_per_chunk
-    est.to_csv(RESULTS_DIR / "storage_estimate.csv", index=False)
+    est.to_csv(ds.results_dir / "storage_estimate.csv", index=False)
 
-    # Codec totals, only where every variable of both frequencies has been measured.
-    full = est.groupby("codec").filter(lambda g: len(g) == 2 * len(VARIABLES))
-    totals = (
-        full.groupby(["codec", "freq"])[["est_bytes", "est_bytes_min", "est_bytes_max", "raw_float32_bytes", "source_zip_bytes", "est_metadata_bytes"]]
-        .sum()
-        .unstack("freq")
-    )
-    summary = pd.DataFrame({
-        "daily_TB": totals[("est_bytes", "daily")] / TB,
-        "monthly_TB": totals[("est_bytes", "monthly")] / TB,
-        "total_TB": (totals[("est_bytes", "daily")] + totals[("est_bytes", "monthly")]) / TB,
-        "total_min_TB": (totals[("est_bytes_min", "daily")] + totals[("est_bytes_min", "monthly")]) / TB,
-        "total_max_TB": (totals[("est_bytes_max", "daily")] + totals[("est_bytes_max", "monthly")]) / TB,
-        "metadata_GB": (totals[("est_metadata_bytes", "daily")] + totals[("est_metadata_bytes", "monthly")]) / 1e9,
-    }).sort_values("total_TB")
-    raw_tb = (totals[("raw_float32_bytes", "daily")] + totals[("raw_float32_bytes", "monthly")]).iloc[0] / TB
-    zip_tb = (totals[("source_zip_bytes", "daily")] + totals[("source_zip_bytes", "monthly")]).iloc[0] / TB if len(totals) else np.nan
+    # Codec totals, only where every variable of every frequency has been measured.
+    full = est.groupby("codec").filter(lambda g: len(g) == len(freqs) * len(ds.variables))
+    cols = ["est_bytes", "est_bytes_min", "est_bytes_max", "raw_float32_bytes", "source_bytes", "est_metadata_bytes"]
+    by_freq = full.groupby(["codec", "freq"])[cols].sum().unstack("freq")
+    summary = pd.DataFrame({f"{f}_TB": by_freq[("est_bytes", f)] / TB for f in freqs})
+    summary["total_TB"] = by_freq["est_bytes"].sum(axis=1) / TB
+    summary["total_min_TB"] = by_freq["est_bytes_min"].sum(axis=1) / TB
+    summary["total_max_TB"] = by_freq["est_bytes_max"].sum(axis=1) / TB
+    summary["metadata_GB"] = by_freq["est_metadata_bytes"].sum(axis=1) / 1e9
+    summary = summary.sort_values("total_TB")
+    raw_tb = by_freq["raw_float32_bytes"].sum(axis=1).iloc[0] / TB
+    src_tb = by_freq["source_bytes"].sum(axis=1).iloc[0] / TB
     summary["ratio_vs_raw"] = raw_tb / summary.total_TB
-    summary.to_csv(RESULTS_DIR / "storage_summary.csv", float_format="%.4f")
+    summary.to_csv(ds.results_dir / "storage_summary.csv", float_format="%.4f")
 
     pd.set_option("display.width", 200)
-    print(f"Record: {n_steps('daily')} days, {n_steps('monthly')} months; raw float32 {raw_tb:.2f} TB; source zips ~{zip_tb:.2f} TB")
-    print(summary.round(3).to_string())
+    print(f"[{ds.name}] record: " + ", ".join(f"{steps[f]} {f} steps" for f in freqs)
+          + f"; raw float32 {raw_tb:.3f} TB; source files ~{src_tb:.3f} TB")
+    print(summary.round(4).to_string())
     if overhead:
-        print("\nIcechunk subset store:", json.dumps(overhead))
+        print("\nIcechunk store:", json.dumps(overhead))
     if args.codec in summary.index:
         h = summary.loc[args.codec]
-        monthly_share = full[(full.codec == args.codec) & (full.freq == "monthly")].est_bytes.sum() / n_steps("monthly")
-        annual_tb = monthly_share * ANNUAL_YEARS / TB  # annual grids compress roughly like monthly ones
-        print(f"\nHeadline ({args.codec}): {h.total_TB:.2f} TB (range {h.total_min_TB:.2f}-{h.total_max_TB:.2f}) "
-              f"+ ~{h.metadata_GB:.1f} GB Icechunk metadata; annual grids would add ~{annual_tb * 1000:.0f} GB")
+        print(f"\nHeadline ({args.codec}): {h.total_TB:.3f} TB (range {h.total_min_TB:.3f}-{h.total_max_TB:.3f}) "
+              f"+ ~{h.metadata_GB:.2f} GB Icechunk metadata")
 
 
 if __name__ == "__main__":

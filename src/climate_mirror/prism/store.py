@@ -8,9 +8,8 @@ import icechunk
 import numpy as np
 import xarray as xr
 
-from prism_mirror.catalog import DATA_DIR, VARIABLES
-
-DEFAULT_STORE = DATA_DIR / "prism_subset.icechunk"
+from climate_mirror.prism.catalog import STORE as DEFAULT_STORE
+from climate_mirror.prism.catalog import VARIABLES
 
 
 def open_prism(group: str = "daily", store: str | Path = DEFAULT_STORE, branch: str = "main") -> xr.Dataset:

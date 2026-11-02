@@ -9,10 +9,10 @@ import numpy as np
 import rasterio
 import rioxarray  # noqa: F401  (registers .rio)
 
-from prism_mirror.catalog import FREQUENCIES, NODATA, VARIABLES, local_zip, sample_dates
-from prism_mirror.io import read_grid
-from prism_mirror.packing import canonical
-from prism_mirror.store import open_prism
+from climate_mirror.prism.catalog import FREQUENCIES, NODATA, VARIABLES, local_zip, sample_dates
+from climate_mirror.prism.io import read_grid
+from climate_mirror.packing import canonical
+from climate_mirror.prism.store import open_prism
 
 from build_store import STORE
 
@@ -55,7 +55,7 @@ def main() -> None:
             for i in check_idx:
                 got = da.isel(time=i).values
                 src = read_grid(var, F, dates[i].date()).data
-                ref = canonical(src, var) if packed else src
+                ref = canonical(src, VARIABLES[var].valid_range) if packed else src
                 if not same_bits(ref, got):
                     raise AssertionError(f"{fname}/{var} {dates[i].date()}: values differ from expected")
                 ok = ~np.isnan(src)

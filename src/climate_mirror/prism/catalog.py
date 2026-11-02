@@ -8,11 +8,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from climate_mirror.paths import RESULTS_DIR as _RESULTS_ROOT
+from climate_mirror.paths import STORES_DIR, cache_path
+from climate_mirror.timeaxis import Frequency
+
 BASE_URL = "https://data.prism.oregonstate.edu/time_series/us/an/800m"
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = REPO_ROOT / "data"
-RAW_DIR = DATA_DIR / "raw"
-RESULTS_DIR = REPO_ROOT / "results"
+RESULTS_DIR = _RESULTS_ROOT / "prism"
+STORE = STORES_DIR / "prism.icechunk"
 
 # Grid (CONUS, 30 arc-second). The GeoTIFF header stores a truncated pixel size
 # (0.008333333333), so coordinates are derived from exact 1/120 degree steps instead.
@@ -63,33 +65,25 @@ VARIABLES: dict[str, Variable] = {
 }
 
 
-@dataclass(frozen=True)
-class Frequency:
-    name: str  # "daily" | "monthly"
-    start: dt.date
-    time_chunk: int
-    space_chunk: int
-
-    def dates(self, end: dt.date) -> pd.DatetimeIndex:
-        freq = "D" if self.name == "daily" else "MS"
-        return pd.date_range(self.start, end, freq=freq)
-
-    def date_str(self, d: dt.date) -> str:
-        return d.strftime("%Y%m%d" if self.name == "daily" else "%Y%m")
-
-    def index_of(self, d: dt.date) -> int:
-        if self.name == "daily":
-            return (d - self.start).days
-        return (d.year - self.start.year) * 12 + (d.month - 1)
-
-    def chunk_dates(self, chunk_index: int) -> pd.DatetimeIndex:
-        all_dates = self.dates(dt.date(2100, 1, 1))
-        return all_dates[chunk_index * self.time_chunk : (chunk_index + 1) * self.time_chunk]
-
-
 DAILY = Frequency("daily", DAILY_START, time_chunk=32, space_chunk=256)
 MONTHLY = Frequency("monthly", MONTHLY_START, time_chunk=12, space_chunk=256)
 FREQUENCIES = {"daily": DAILY, "monthly": MONTHLY}
+
+# Last grids listed on data.prism.oregonstate.edu when the estimate was made (2026-11-02).
+RECORD_END = {"daily": dt.date(2026, 11, 1), "monthly": dt.date(2026, 10, 1)}
+
+# Thresholds (native units) checked for classification flips in the rounding analysis.
+THRESHOLDS = {
+    "ppt": [0.01, 0.1, 0.254, 1.0, 10.0, 25.4, 50.8],
+    "tmin": [0.0, -17.778],
+    "tmax": [0.0, 32.222, 35.0],
+    "tmean": [0.0, 5.0, 10.0],
+    "tdmean": [0.0],
+    "vpdmin": [1.0],
+    "vpdmax": [10.0, 30.0],
+    "soltotal": [5.0],
+    "solslope": [5.0],
+}
 
 # Representative sample: whole time chunks spread across eras and seasons.
 SAMPLE_TARGETS = {
@@ -107,7 +101,7 @@ def sample_dates(freq: Frequency) -> pd.DatetimeIndex:
 
 
 def file_stem(var: str, freq: Frequency, d: dt.date) -> str:
-    return f"prism_{var}_us_30s_{freq.date_str(d)}"
+    return f"prism_{var}_us_30s_{d:%Y%m%d}" if freq.name == "daily" else f"prism_{var}_us_30s_{d:%Y%m}"
 
 
 def url(var: str, freq: Frequency, d: dt.date) -> str:
@@ -115,4 +109,4 @@ def url(var: str, freq: Frequency, d: dt.date) -> str:
 
 
 def local_zip(var: str, freq: Frequency, d: dt.date) -> Path:
-    return RAW_DIR / freq.name / var / f"{file_stem(var, freq, d)}.zip"
+    return cache_path(url(var, freq, d))

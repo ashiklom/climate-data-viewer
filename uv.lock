@@ -129,6 +129,41 @@ wheels = [
 ]
 
 [[package]]
+name = "climate-mirror"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "cast-value-rs" },
+    { name = "dask" },
+    { name = "httpx" },
+    { name = "icechunk" },
+    { name = "numcodecs", extra = ["pcodec"] },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "rasterio" },
+    { name = "rioxarray" },
+    { name = "tqdm" },
+    { name = "xarray" },
+    { name = "zarr" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cast-value-rs", specifier = ">=0.5.1" },
+    { name = "dask", specifier = ">=2026.8.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "icechunk", specifier = ">=2.3.1" },
+    { name = "numcodecs", extras = ["pcodec"], specifier = ">=0.17.1" },
+    { name = "numpy", specifier = ">=2.5.4" },
+    { name = "pandas", specifier = ">=3.1.0" },
+    { name = "rasterio", specifier = ">=1.5.2" },
+    { name = "rioxarray", specifier = ">=0.24.0" },
+    { name = "tqdm", specifier = ">=4.70.1" },
+    { name = "xarray", specifier = ">=2026.9.0" },
+    { name = "zarr", specifier = ">=3" },
+]
+
+[[package]]
 name = "cloudpickle"
 version = "3.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -553,41 +588,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/09/6c/2113665f442ddc5392cb93122d07d33602d481c01d5524e68b138daf25a6/pcodec-1.0.4-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:661d26eeebe0c0d75b15ec141536eea7386c228cb00f3c39f171d4ff18ca1afd", size = 585472, upload-time = "2026-10-05T17:33:05.053Z" },
     { url = "https://files.pythonhosted.org/packages/0e/e7/7c187ccee92d7e2ef2c0c57756184732915066b8a0b5cb64cb431e25551c/pcodec-1.0.4-cp314-cp314t-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:3e889a2ec1e88841bff9118d88ac4b9c01bc22341bb2f5aa32c9be9145289cb5", size = 604295, upload-time = "2026-10-05T17:32:54.478Z" },
     { url = "https://files.pythonhosted.org/packages/92/60/ca34c1a57474cdbf215a8365e6dc5f2489bcd65b790dd1916b74fb8efa6f/pcodec-1.0.4-cp314-cp314t-win_amd64.whl", hash = "sha256:9f9f38a43fa040489d9199b2070cce405b55d9ffbc2ea5d42be40b846e137e1c", size = 474181, upload-time = "2026-10-05T17:33:39.876Z" },
-]
-
-[[package]]
-name = "prism-mirror"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "cast-value-rs" },
-    { name = "dask" },
-    { name = "httpx" },
-    { name = "icechunk" },
-    { name = "numcodecs", extra = ["pcodec"] },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "rasterio" },
-    { name = "rioxarray" },
-    { name = "tqdm" },
-    { name = "xarray" },
-    { name = "zarr" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "cast-value-rs", specifier = ">=0.5.1" },
-    { name = "dask", specifier = ">=2026.8.0" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "icechunk", specifier = ">=2.3.1" },
-    { name = "numcodecs", extras = ["pcodec"], specifier = ">=0.17.1" },
-    { name = "numpy", specifier = ">=2.5.4" },
-    { name = "pandas", specifier = ">=3.1.0" },
-    { name = "rasterio", specifier = ">=1.5.2" },
-    { name = "rioxarray", specifier = ">=0.24.0" },
-    { name = "tqdm", specifier = ">=4.70.1" },
-    { name = "xarray", specifier = ">=2026.9.0" },
-    { name = "zarr", specifier = ">=3" },
 ]
 
 [[package]]

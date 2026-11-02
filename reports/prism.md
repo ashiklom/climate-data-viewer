@@ -1,6 +1,6 @@
 # PRISM 800m in Icechunk: layout, compression, and full-mirror storage estimate
 
-*Generated from `results/*.csv` on 2026-11-02. The sample covers all 9 PRISM variables over the full CONUS grid.*
+*Generated from `results/prism/*.csv` on 2026-11-02. The sample covers all 9 PRISM variables over the full CONUS grid.*
 
 ## Headline
 
@@ -81,7 +81,7 @@ PRISM grids encode the same decimal values in float32 in different ways, varying
 
 A single CF `scale_factor` can't reproduce all of these bit for bit. The mirror therefore stores the decimal integer `k` in 1e-4 units, and every reader decodes one consistent float32 per decimal value. `pack()` refuses any value that would move by more than half a quantum (5e-5) plus 1 ulp.
 
-**Measured effect** (`results/rounding_analysis.csv`, all sampled grids):
+**Measured effect** (`results/prism/rounding_analysis.csv`, all sampled grids):
 
 - **mul-style grids:**
   - 31–58% of values move by exactly 1 ulp (≤1.19e-7 relative); max |Δ| is 3.8e-6 °C for temperature and 6.1e-5 mm for monthly ppt.
@@ -98,17 +98,17 @@ A single CF `scale_factor` can't reproduce all of these bit for bit. The mirror 
 - `-9999` becomes NaN: `_FillValue` sentinel in packed arrays, NaN fill in float arrays. The reader asserts that no other sentinel-like or implausible values remain.
 - Pixel-center coordinates are computed exactly from 1/120° steps, rather than from the header's truncated `0.008333333333` pixel size. Over the full 7,025 columns the two differ by 2.3e-9°, which is negligible, but the exact centers are the canonical ones and match other 30″ grids.
 - CF-1.10 metadata: `crs` grid mapping (NAD83, EPSG:4269), lat/lon/time bounds, `cell_methods`, units and standard names, and PRISM provenance (dataset version, type, creation date) as per-time auxiliary coordinates.
-- `prism_mirror.store.open_prism()` returns lazy float32 variables.
+- `climate_mirror.prism.store.open_prism()` returns lazy float32 variables.
 
 ## Reproduce
 
 ```bash
-uv run python scripts/download_sample.py              # cached; never re-downloads (PRISM's 2-per-24h rule)
-uv run python scripts/compression_experiments.py --freq monthly --blocks first   # full codec matrix
-uv run python scripts/compression_experiments.py --blocks all --codecs <top codecs>
-uv run python scripts/compression_experiments.py --layouts --codecs cf-uint+pcodec8
-uv run python scripts/build_store.py --overwrite      # data/prism_subset.icechunk
-uv run python scripts/rounding_analysis.py
-cd scripts && uv run python verify_store.py && cd ..
-uv run python scripts/estimate.py
+uv run python scripts/prism/download_sample.py        # cached under cache/data.prism.oregonstate.edu/; never re-downloads
+uv run python scripts/compression_experiments.py --dataset prism --freq monthly --blocks first   # full codec matrix
+uv run python scripts/compression_experiments.py --dataset prism --blocks all --codecs <top codecs>
+uv run python scripts/compression_experiments.py --dataset prism --layouts --codecs cf-uint+pcodec8
+uv run python scripts/prism/build_store.py --overwrite
+uv run python scripts/rounding_analysis.py --dataset prism
+(cd scripts/prism && uv run python verify_store.py)
+uv run python scripts/estimate.py --dataset prism --store <store path>
 ```

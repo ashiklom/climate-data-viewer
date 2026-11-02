@@ -1,7 +1,7 @@
 [project]
-name = "prism-mirror"
+name = "climate-mirror"
 version = "0.1.0"
-description = "Tools for mirroring PRISM climate data into Icechunk"
+description = "Cloud-native (Icechunk) mirrors of climate datasets, with sizing studies and a comparison website"
 authors = [
     { name = "Alexey Shiklomanov", email = "alexey.shiklomanov@gmail.com" }
 ]

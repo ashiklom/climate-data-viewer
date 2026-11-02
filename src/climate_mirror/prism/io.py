@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import rasterio
 
-from prism_mirror.catalog import NODATA, NORTH, NX, NY, RES, VARIABLES, WEST, Frequency, local_zip
+from climate_mirror.prism.catalog import NODATA, NORTH, NX, NY, RES, VARIABLES, WEST, Frequency, local_zip
 
 
 @dataclass

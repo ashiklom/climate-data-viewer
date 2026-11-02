@@ -5,7 +5,7 @@ The time axis is compact (only the sampled dates), and each sampled block fills 
 one time chunk. Coordinates and attributes follow CF-1.10; -9999 is stored as NaN (float
 codecs) or as the integer _FillValue of a CF-packed array (cf-uint/cf-int32 codecs). Packed
 arrays hold harmonized decimal values: CF readers get the float32 nearest each decimal value,
-within 1 ulp of the source float32 (see prism_mirror/packing.py).
+within 1 ulp of the source float32 (see climate_mirror/packing.py).
 """
 
 from __future__ import annotations
@@ -22,12 +22,13 @@ import xarray as xr
 import zarr
 from rasterio.crs import CRS
 
-from prism_mirror.catalog import (
-    BASE_URL, DATA_DIR, FREQUENCIES, NX, NY, RES, VARIABLES, Frequency, local_zip, sample_chunks, sample_dates,
+from climate_mirror.prism.catalog import (
+    BASE_URL, FREQUENCIES, NX, NY, RES, VARIABLES, Frequency, local_zip, sample_chunks, sample_dates,
 )
-from prism_mirror.codecs import CODEC_NAMES, codec_kwargs, split_name
-from prism_mirror.io import lat_centers, lon_centers, read_grid
-from prism_mirror.packing import cf_attrs, pack
+from climate_mirror.paths import DATA_DIR
+from climate_mirror.codecs import CODEC_NAMES, codec_kwargs, split_name
+from climate_mirror.prism.io import lat_centers, lon_centers, read_grid
+from climate_mirror.packing import cf_attrs, pack
 
 STORE = DATA_DIR / "prism_subset.icechunk"
 TIME_UNITS = "days since 1895-01-01"
@@ -107,7 +108,7 @@ def global_attrs(freq: Frequency, codec: str) -> dict:
         "references": "https://prism.oregonstate.edu/documents/PRISM_datasets.pdf",
         "acknowledgement": CITATION,
         "history": (
-            f"{dt.datetime.now(dt.UTC):%Y-%m-%dT%H:%M:%SZ} converted from PRISM COGs by prism_mirror/build_store.py: "
+            f"{dt.datetime.now(dt.UTC):%Y-%m-%dT%H:%M:%SZ} converted from PRISM COGs by scripts/prism/build_store.py: "
             "-9999 nodata -> NaN; pixel-center coordinates recomputed exactly from 1/120 degree spacing; "
             "values harmonized to exact decimal integers when an integer codec is used."
         ),
@@ -150,7 +151,7 @@ def build_group(repo: icechunk.Repository, freq: Frequency, variables: list[str]
 
         dtype, fill = np.dtype("float32"), np.nan
         if packing:
-            dtype, pack_attrs = cf_attrs(var, packing)
+            dtype, pack_attrs = cf_attrs(meta.valid_range, packing)
             fill = pack_attrs["_FillValue"]
             # zarr v3 readers (xarray) mask on the CF _FillValue attribute, not on the array fill_value.
             attrs["_FillValue"] = int(fill)
@@ -175,7 +176,7 @@ def build_group(repo: icechunk.Repository, freq: Frequency, variables: list[str]
         for k, ci in enumerate(sample_chunks(freq)):
             block = np.stack([read_grid(var, freq, d.date()).data for d in freq.chunk_dates(ci)])
             if packing:
-                block, _ = pack(block, var, packing)  # raises if any value would move > 1 ulp
+                block, _ = pack(block, meta.valid_range, packing, label=var)  # raises if a value would move > SCALE/2 + 1 ulp
             arr[k * freq.time_chunk : (k + 1) * freq.time_chunk] = block
         session.commit(f"{freq.name}/{var}: write {len(dates)} sampled time steps")
         print(f"  wrote {freq.name}/{var} ({arr.dtype})", flush=True)

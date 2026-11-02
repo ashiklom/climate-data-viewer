@@ -12,7 +12,7 @@ import zipfile
 import httpx
 from tqdm import tqdm
 
-from prism_mirror.catalog import FREQUENCIES, VARIABLES, local_zip, sample_dates, url
+from climate_mirror.prism.catalog import FREQUENCIES, VARIABLES, local_zip, sample_dates, url
 
 
 def fetch(client: httpx.Client, src: str, dest) -> int:
