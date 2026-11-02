@@ -1,5 +1,7 @@
-"""Download the representative PRISM sample (whole time chunks, every variable) into data/raw.
+"""Download PRISM grid packages into the permanent cache (cache/data.prism.oregonstate.edu/...).
 
+By default fetches the representative sample (whole time chunks, every variable). With
+--start/--end, fetches every period in the whole time chunks overlapping that range instead.
 Files already on disk are never re-requested: PRISM blocks a file after two downloads in 24 h.
 """
 
@@ -11,6 +13,8 @@ import zipfile
 
 import httpx
 from tqdm import tqdm
+
+import datetime as dt
 
 from climate_mirror.prism.catalog import FREQUENCIES, VARIABLES, local_zip, sample_dates, url
 
@@ -37,13 +41,20 @@ def main() -> None:
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--freq", choices=list(FREQUENCIES), nargs="*", default=list(FREQUENCIES))
     p.add_argument("--vars", nargs="*", default=list(VARIABLES))
+    p.add_argument("--start", type=dt.date.fromisoformat, help="fetch whole chunks overlapping [start, end]")
+    p.add_argument("--end", type=dt.date.fromisoformat)
     args = p.parse_args()
+
+    def dates_for(f):
+        if args.start is None:
+            return sample_dates(f)
+        return [d for c in f.chunk_indices(args.start, args.end) for d in f.chunk_dates(c)]
 
     jobs = [
         (url(v, f, d), local_zip(v, f, d))
         for fname in args.freq
         for f in [FREQUENCIES[fname]]
-        for d in sample_dates(f)
+        for d in dates_for(f)
         for v in args.vars
     ]
     todo = [j for j in jobs if not j[1].exists()]

@@ -1,11 +1,13 @@
-"""Build the native Icechunk store holding the representative PRISM 800m sample.
+"""Build or extend the PRISM 800m Icechunk mirror (location from stores.toml, [mirrors.prism]).
 
-Layout: groups `daily/` and `monthly/`, each with the 9 PRISM variables on (time, lat, lon).
-The time axis is compact (only the sampled dates), and each sampled block fills exactly
-one time chunk. Coordinates and attributes follow CF-1.10; -9999 is stored as NaN (float
-codecs) or as the integer _FillValue of a CF-packed array (cf-uint/cf-int32 codecs). Packed
-arrays hold harmonized decimal values: CF readers get the float32 nearest each decimal value,
-within 1 ulp of the source float32 (see climate_mirror/packing.py).
+Layout: groups `daily/` and `monthly/`, each with the PRISM variables on (time, lat, lon) over the
+**full record** (daily 1981-, monthly 1895- through catalog.RECORD_END). Only the whole time chunks
+selected here are written (--sample and/or --start/--end); everything else reads as missing and
+costs no storage, so the repo grows into a full mirror in place.
+
+Values: -9999 becomes missing. With an integer codec (cf-uint/cf-int32) values are stored as
+harmonized decimal integers (CF scale_factor/add_offset/_FillValue); see climate_mirror/packing.py.
+Metadata: CF-1.10 plus GeoZarr (spatial:*, proj:code) group attributes for map clients.
 """
 
 from __future__ import annotations
@@ -22,26 +24,27 @@ import xarray as xr
 import zarr
 from rasterio.crs import CRS
 
-from climate_mirror.prism.catalog import (
-    BASE_URL, FREQUENCIES, NX, NY, RES, VARIABLES, Frequency, local_zip, sample_chunks, sample_dates,
-)
-from climate_mirror.paths import DATA_DIR
+from climate_mirror import storage
 from climate_mirror.codecs import CODEC_NAMES, codec_kwargs, split_name
-from climate_mirror.prism.io import lat_centers, lon_centers, read_grid
 from climate_mirror.packing import cf_attrs, pack
+from climate_mirror.prism.catalog import (
+    BASE_URL, FREQUENCIES, NORTH, NX, NY, RECORD_END, RES, VARIABLES, WEST, Frequency, local_zip, sample_chunks,
+)
+from climate_mirror.prism.io import lat_centers, lon_centers, read_grid
 
-STORE = DATA_DIR / "prism_subset.icechunk"
+MIRROR = "prism"
 TIME_UNITS = "days since 1895-01-01"
 INFO_FIELDS = {
     "PRISM_DATASET_TYPE": "prism_dataset_type",
     "PRISM_DATASET_VERSION": "prism_dataset_version",
     "PRISM_DATASET_CREATE_DATE": "prism_dataset_create_date",
 }
+INFO_DTYPE = "<U16"
 HARMONIZED_COMMENT = (
     "Stored as integer decimal values (CF scale_factor/add_offset). PRISM source grids encode the same "
     "decimal values in float32 in slightly different ways (float32(k/1000) vs float32(k)*float32(0.001)); "
     "decoding here yields one consistent float32 per decimal value, within 1 ulp (<=1.2e-7 relative) "
-    "of the source float32."
+    "of the source float32. Unrounded source values are rounded to the nearest 1e-4."
 )
 CITATION = (
     "PRISM Group, Oregon State University, https://prism.oregonstate.edu. "
@@ -56,12 +59,7 @@ def read_info(var: str, freq: Frequency, d: dt.date) -> dict[str, str]:
     return {k.strip(): v.strip() for k, v in (l.split(":", 1) for l in text.splitlines() if ":" in l)}
 
 
-def time_bounds(freq: Frequency, dates: pd.DatetimeIndex) -> np.ndarray:
-    end = dates + (pd.Timedelta(days=1) if freq.name == "daily" else pd.offsets.MonthBegin(1))
-    return np.stack([dates.values, end.values], axis=1)
-
-
-def coordinate_dataset(freq: Frequency, dates: pd.DatetimeIndex) -> xr.Dataset:
+def coordinate_dataset(freq: Frequency, dates: pd.DatetimeIndex, variables: list[str]) -> xr.Dataset:
     lat, lon = lat_centers(), lon_centers()
     wkt = CRS.from_epsg(4269).to_wkt()
     crs = xr.DataArray(
@@ -75,7 +73,7 @@ def coordinate_dataset(freq: Frequency, dates: pd.DatetimeIndex) -> xr.Dataset:
             "horizontal_datum_name": "North American Datum 1983",
             "crs_wkt": wkt,
             "spatial_ref": wkt,
-            "GeoTransform": f"{lon[0] - RES / 2!r} {RES!r} 0 {lat[0] + RES / 2!r} 0 {-RES!r}",
+            "GeoTransform": f"{WEST!r} {RES!r} 0 {NORTH!r} 0 {-RES!r}",
         },
     )
     period = "day ending 12:00 UTC on the labelled date" if freq.name == "daily" else "calendar month"
@@ -91,114 +89,150 @@ def coordinate_dataset(freq: Frequency, dates: pd.DatetimeIndex) -> xr.Dataset:
             "crs": crs,
         },
         data_vars={
-            "time_bnds": (("time", "nv"), time_bounds(freq, dates)),
+            "time_bnds": (("time", "nv"), np.stack([dates.values, freq.ends(dates).values], axis=1)),
             "lat_bnds": (("lat", "nv"), np.stack([lat + RES / 2, lat - RES / 2], axis=1)),
             "lon_bnds": (("lon", "nv"), np.stack([lon - RES / 2, lon + RES / 2], axis=1)),
         },
     )
+    # Per-grid PRISM provenance (dataset version / creation date), filled in as chunks are written.
+    for var in variables:
+        for name in INFO_FIELDS.values():
+            ds.coords[f"{var}_{name}"] = ("time", np.full(len(dates), "", dtype=INFO_DTYPE))
     return ds
 
 
-def global_attrs(freq: Frequency, codec: str) -> dict:
+def group_attrs(freq: Frequency, codec: str) -> dict:
     return {
         "Conventions": "CF-1.10",
-        "title": f"PRISM 800m (30 arc-second) {freq.name} climate grids, CONUS - representative subset",
+        "title": f"PRISM 800m (30 arc-second) {freq.name} climate grids, CONUS",
         "institution": "PRISM Group, Oregon State University",
         "source": f"{BASE_URL} (COG grid packages)",
         "references": "https://prism.oregonstate.edu/documents/PRISM_datasets.pdf",
         "acknowledgement": CITATION,
         "history": (
-            f"{dt.datetime.now(dt.UTC):%Y-%m-%dT%H:%M:%SZ} converted from PRISM COGs by scripts/prism/build_store.py: "
-            "-9999 nodata -> NaN; pixel-center coordinates recomputed exactly from 1/120 degree spacing; "
+            f"{dt.datetime.now(dt.UTC):%Y-%m-%dT%H:%M:%SZ} created by scripts/prism/build_store.py: "
+            "-9999 nodata -> missing; pixel-center coordinates computed exactly from 1/120 degree spacing; "
             "values harmonized to exact decimal integers when an integer codec is used."
         ),
-        "comment": "Subset: only whole sampled time chunks are present; the time axis is not contiguous.",
-        "prism_mirror_codec": codec,
+        "comment": "Partial mirror: only some whole time chunks are written; other times read as missing.",
+        "mirror_codec": codec,
+        # GeoZarr (zarr-conventions spatial + geo-proj) for map clients; affine in rasterio order (a, b, c, d, e, f).
+        "spatial:dimensions": ["lat", "lon"],
+        "spatial:transform": [RES, 0.0, WEST, 0.0, -RES, NORTH],
+        "spatial:shape": [NY, NX],
+        "spatial:registration": "pixel",
+        "proj:code": "EPSG:4269",
     }
 
 
-def build_group(repo: icechunk.Repository, freq: Frequency, variables: list[str], codec: str) -> None:
-    dates = sample_dates(freq)
-    chunks = (freq.time_chunk, freq.space_chunk, freq.space_chunk)
+def var_attrs(var: str, freq: Frequency, packing: str | None) -> tuple[np.dtype, object, dict]:
+    meta = VARIABLES[var]
+    attrs = {
+        "long_name": meta.long_name,
+        "units": meta.units,
+        "cell_methods": meta.daily_cell_method if freq.name == "daily" else meta.monthly_cell_method,
+        "grid_mapping": "crs",
+        "coordinates": " ".join(f"{var}_{n}" for n in INFO_FIELDS.values()),
+    }
+    if meta.standard_name:
+        attrs["standard_name"] = meta.standard_name
+    if not packing:
+        return np.dtype("float32"), np.nan, attrs
+    dtype, pack_attrs = cf_attrs(meta.valid_range, packing)
+    # zarr v3 readers (xarray) mask on the CF _FillValue attribute, not on the array fill_value.
+    attrs["_FillValue"] = int(pack_attrs["_FillValue"])
+    attrs["scale_factor"] = pack_attrs["scale_factor"]
+    if "add_offset" in pack_attrs:
+        attrs["add_offset"] = pack_attrs["add_offset"]
+    attrs["comment"] = HARMONIZED_COMMENT
+    return dtype, pack_attrs["_FillValue"], attrs
 
+
+def init_group(repo: icechunk.Repository, freq: Frequency, codec: str) -> None:
+    """Create the group (full time axis, coordinates, empty variables) if it does not exist yet."""
     session = repo.writable_session("main")
-    ds = coordinate_dataset(freq, dates)
-    ds.attrs = global_attrs(freq, codec)
-    # Per-grid PRISM provenance (dataset version / creation date) as auxiliary time coordinates.
-    for key, name in INFO_FIELDS.items():
-        for var in variables:
-            vals = [read_info(var, freq, d.date()).get(key, "") for d in dates]
-            ds.coords[f"{var}_{name}"] = ("time", np.array(vals, dtype="U"))
+    try:
+        zarr.open_group(session.store, path=freq.name, mode="r")
+        return
+    except (FileNotFoundError, zarr.errors.GroupNotFoundError):
+        pass
+    variables = list(VARIABLES)
+    dates = freq.dates(RECORD_END[freq.name])
+    ds = coordinate_dataset(freq, dates, variables)
+    ds.attrs = group_attrs(freq, codec)
     encoding = {
         "time": {"units": TIME_UNITS, "calendar": "proleptic_gregorian", "dtype": "int32"},
         "time_bnds": {"units": TIME_UNITS, "calendar": "proleptic_gregorian", "dtype": "int32"},
     }
     ds.to_zarr(session.store, group=freq.name, mode="w", encoding=encoding, consolidated=False, zarr_format=3)
-    session.commit(f"{freq.name}: coordinates ({codec})")
-
+    group = zarr.open_group(session.store, path=freq.name, mode="r+")
     packing, _ = split_name(codec)
     for var in variables:
-        meta = VARIABLES[var]
-        attrs = {
-            "long_name": meta.long_name,
-            "units": meta.units,
-            "cell_methods": meta.daily_cell_method if freq.name == "daily" else meta.monthly_cell_method,
-            "grid_mapping": "crs",
-            "coordinates": " ".join(f"{var}_{n}" for n in INFO_FIELDS.values()),
-        }
-        if meta.standard_name:
-            attrs["standard_name"] = meta.standard_name
-
-        dtype, fill = np.dtype("float32"), np.nan
-        if packing:
-            dtype, pack_attrs = cf_attrs(meta.valid_range, packing)
-            fill = pack_attrs["_FillValue"]
-            # zarr v3 readers (xarray) mask on the CF _FillValue attribute, not on the array fill_value.
-            attrs["_FillValue"] = int(fill)
-            attrs["scale_factor"] = pack_attrs["scale_factor"]
-            if "add_offset" in pack_attrs:
-                attrs["add_offset"] = pack_attrs["add_offset"]
-            attrs["comment"] = HARMONIZED_COMMENT
-
-        session = repo.writable_session("main")
-        group = zarr.open_group(session.store, path=freq.name, mode="r+")
-        arr = group.create_array(
+        dtype, fill, attrs = var_attrs(var, freq, packing)
+        group.create_array(
             var,
             shape=(len(dates), NY, NX),
             dtype=dtype,
-            chunks=chunks,
+            chunks=(freq.time_chunk, freq.space_chunk, freq.space_chunk),
             fill_value=fill,
             dimension_names=["time", "lat", "lon"],
             attributes=attrs,
             config={"write_empty_chunks": False},
             **codec_kwargs(codec, dtype.itemsize),
         )
-        for k, ci in enumerate(sample_chunks(freq)):
-            block = np.stack([read_grid(var, freq, d.date()).data for d in freq.chunk_dates(ci)])
-            if packing:
-                block, _ = pack(block, meta.valid_range, packing, label=var)  # raises if a value would move > SCALE/2 + 1 ulp
-            arr[k * freq.time_chunk : (k + 1) * freq.time_chunk] = block
-        session.commit(f"{freq.name}/{var}: write {len(dates)} sampled time steps")
-        print(f"  wrote {freq.name}/{var} ({arr.dtype})", flush=True)
+    session.commit(f"{freq.name}: full-record time axis {dates[0].date()}..{dates[-1].date()}, empty variables ({codec})")
+
+
+def write_chunks(repo: icechunk.Repository, freq: Frequency, var: str, chunk_indices: list[int]) -> None:
+    session = repo.writable_session("main")
+    group = zarr.open_group(session.store, path=freq.name, mode="r+")
+    arr = group[var]
+    packing, _ = split_name(group.attrs["mirror_codec"])
+    meta = VARIABLES[var]
+    n = arr.shape[0]
+    for ci in chunk_indices:
+        i0, i1 = ci * freq.time_chunk, min((ci + 1) * freq.time_chunk, n)
+        dates = freq.chunk_dates(ci)[: i1 - i0]
+        block = np.stack([read_grid(var, freq, d.date()).data for d in dates])
+        if packing:
+            block, _ = pack(block, meta.valid_range, packing, label=var)  # raises if a value would move > SCALE/2 + 1 ulp
+        arr[i0:i1] = block
+        infos = [read_info(var, freq, d.date()) for d in dates]
+        for key, name in INFO_FIELDS.items():
+            group[f"{var}_{name}"][i0:i1] = np.array([i.get(key, "") for i in infos], dtype=INFO_DTYPE)
+    session.commit(f"{freq.name}/{var}: write time chunks {chunk_indices}")
+    print(f"  wrote {freq.name}/{var}: {len(chunk_indices)} chunks", flush=True)
 
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--codec", default="cf-uint+pcodec8", choices=CODEC_NAMES)
+    p.add_argument("--codec", default="cf-uint+pcodec8", choices=CODEC_NAMES, help="only used when creating groups")
     p.add_argument("--freq", choices=list(FREQUENCIES), nargs="*", default=list(FREQUENCIES))
     p.add_argument("--vars", nargs="*", default=list(VARIABLES))
-    p.add_argument("--store", default=str(STORE))
-    p.add_argument("--overwrite", action="store_true")
+    p.add_argument("--sample", action="store_true", help="write the representative sample chunks")
+    p.add_argument("--start", type=dt.date.fromisoformat, help="write whole chunks overlapping [start, end]")
+    p.add_argument("--end", type=dt.date.fromisoformat)
+    p.add_argument("--overwrite", action="store_true", help="delete a local mirror first")
     args = p.parse_args()
     zarr.config.set({"threading.max_workers": 18, "async.concurrency": 64})
 
     if args.overwrite:
-        shutil.rmtree(args.store, ignore_errors=True)
-    storage = icechunk.local_filesystem_storage(args.store)
-    repo = icechunk.Repository.open_or_create(storage)
+        path = storage.local_path(MIRROR)
+        if path is None:
+            raise SystemExit("--overwrite only deletes local mirrors")
+        shutil.rmtree(path, ignore_errors=True)
+    repo = storage.open_mirror(MIRROR, create=True)
     for fname in args.freq:
-        print(f"building {fname} with {args.codec}", flush=True)
-        build_group(repo, FREQUENCIES[fname], args.vars, args.codec)
+        freq = FREQUENCIES[fname]
+        init_group(repo, freq, args.codec)
+        chunks = set(sample_chunks(freq)) if args.sample else set()
+        if args.start:
+            chunks |= set(freq.chunk_indices(args.start, args.end or args.start))
+        if not chunks:
+            continue
+        print(f"{fname}: writing chunks {sorted(chunks)}", flush=True)
+        for var in args.vars:
+            write_chunks(repo, freq, var, sorted(chunks))
 
 
 if __name__ == "__main__":

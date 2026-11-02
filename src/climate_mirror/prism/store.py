@@ -8,18 +8,21 @@ import icechunk
 import numpy as np
 import xarray as xr
 
-from climate_mirror.prism.catalog import STORE as DEFAULT_STORE
+from climate_mirror import storage
 from climate_mirror.prism.catalog import VARIABLES
 
 
-def open_prism(group: str = "daily", store: str | Path = DEFAULT_STORE, branch: str = "main") -> xr.Dataset:
+def open_prism(group: str = "daily", store: str | Path | None = None, branch: str = "main") -> xr.Dataset:
     """Open one frequency group ("daily" or "monthly") lazily, with variables as float32.
 
     Packed variables are CF integers; xarray decodes them to float64 because zarr JSON attributes
     carry a float64 scale_factor. Casting back gives the harmonized float32 values (the float32
     nearest each PRISM decimal value) at half the memory.
     """
-    repo = icechunk.Repository.open(icechunk.local_filesystem_storage(str(store)))
+    if store is None:  # the mirror configured in stores.toml
+        repo = storage.open_mirror("prism")
+    else:
+        repo = icechunk.Repository.open(icechunk.local_filesystem_storage(str(store)))
     # Dask-backed (store chunks) so the float32 cast below stays lazy; without it the cast loads every variable.
     ds = xr.open_zarr(repo.readonly_session(branch).store, group=group, consolidated=False, chunks={})
     for var in VARIABLES:
