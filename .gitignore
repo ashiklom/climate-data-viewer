@@ -5,3 +5,5 @@ __pycache__/
 cache/
 
 _credentials.toml
+site/node_modules/
+site/dist/

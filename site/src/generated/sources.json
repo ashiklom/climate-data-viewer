@@ -1,0 +1,485 @@
+{
+ "canonical": {
+  "pr": {
+   "name": "pr",
+   "long_name": "Precipitation",
+   "units": "mm day-1",
+   "standard_name": "lwe_precipitation_rate",
+   "cell_methods": "time: sum",
+   "colormap": "precip",
+   "diff_colormap": "BrBG",
+   "comparable_note": ""
+  },
+  "tas": {
+   "name": "tas",
+   "long_name": "Mean 2 m air temperature",
+   "units": "degC",
+   "standard_name": "air_temperature",
+   "cell_methods": "time: mean",
+   "colormap": "thermal",
+   "diff_colormap": "RdBu_r",
+   "comparable_note": "PRISM tmean is (tmin+tmax)/2, not a 24-hour mean."
+  },
+  "tasmax": {
+   "name": "tasmax",
+   "long_name": "Maximum 2 m air temperature",
+   "units": "degC",
+   "standard_name": "air_temperature",
+   "cell_methods": "time: maximum",
+   "colormap": "thermal",
+   "diff_colormap": "RdBu_r",
+   "comparable_note": "Reanalysis maxima use hourly values; station-based products use instantaneous extremes."
+  },
+  "tasmin": {
+   "name": "tasmin",
+   "long_name": "Minimum 2 m air temperature",
+   "units": "degC",
+   "standard_name": "air_temperature",
+   "cell_methods": "time: minimum",
+   "colormap": "thermal",
+   "diff_colormap": "RdBu_r",
+   "comparable_note": "Reanalysis minima use hourly values; station-based products use instantaneous extremes."
+  },
+  "tdps": {
+   "name": "tdps",
+   "long_name": "Mean 2 m dew point temperature",
+   "units": "degC",
+   "standard_name": "dew_point_temperature",
+   "cell_methods": "time: mean",
+   "colormap": "haline",
+   "diff_colormap": "RdBu_r",
+   "comparable_note": ""
+  },
+  "ps": {
+   "name": "ps",
+   "long_name": "Mean surface pressure",
+   "units": "hPa",
+   "standard_name": "surface_air_pressure",
+   "cell_methods": "time: mean",
+   "colormap": "dense",
+   "diff_colormap": "RdBu_r",
+   "comparable_note": ""
+  },
+  "rsds": {
+   "name": "rsds",
+   "long_name": "Surface downwelling shortwave radiation",
+   "units": "MJ m-2 day-1",
+   "standard_name": "surface_downwelling_shortwave_flux_in_air",
+   "cell_methods": "time: sum",
+   "colormap": "solar",
+   "diff_colormap": "RdBu_r",
+   "comparable_note": ""
+  },
+  "sfcWind": {
+   "name": "sfcWind",
+   "long_name": "Mean 10 m wind speed",
+   "units": "m s-1",
+   "standard_name": "wind_speed",
+   "cell_methods": "time: mean",
+   "colormap": "speed",
+   "diff_colormap": "RdBu_r",
+   "comparable_note": "MERRA-2 (POWER) reports 2 m and 10 m wind; ERA5 uses hourly 10 m speed."
+  },
+  "sm1": {
+   "name": "sm1",
+   "long_name": "Surface-layer soil moisture",
+   "units": "m3 m-3",
+   "standard_name": "volume_fraction_of_condensed_water_in_soil",
+   "cell_methods": "time: mean",
+   "colormap": "rain",
+   "diff_colormap": "BrBG",
+   "comparable_note": "ERA5/ERA5-Land layer 1 is 0-7 cm; MERRA-2 GWETTOP is a 0-1 wetness fraction, not volumetric."
+  },
+  "sm2": {
+   "name": "sm2",
+   "long_name": "Second-layer soil moisture",
+   "units": "m3 m-3",
+   "standard_name": "volume_fraction_of_condensed_water_in_soil",
+   "cell_methods": "time: mean",
+   "colormap": "rain",
+   "diff_colormap": "BrBG",
+   "comparable_note": "ERA5/ERA5-Land layer 2 is 7-28 cm."
+  }
+ },
+ "common_grid": {
+  "res": 0.25,
+  "north": 90.0,
+  "west": -180.0,
+  "ny": 721,
+  "nx": 1440
+ },
+ "grids": {
+  "chirps": {
+   "north": 59.975,
+   "west": -179.975,
+   "res": 0.05,
+   "ny": 2400,
+   "nx": 7200,
+   "crs": "EPSG:4326"
+  },
+  "era5land": {
+   "north": 90.0,
+   "west": -180.0,
+   "res": 0.1,
+   "ny": 1801,
+   "nx": 3600,
+   "crs": "EPSG:4326"
+  },
+  "era5": {
+   "north": 90.0,
+   "west": -180.0,
+   "res": 0.25,
+   "ny": 721,
+   "nx": 1440,
+   "crs": "EPSG:4326"
+  }
+ },
+ "prototype_period": [
+  "2021-01-01",
+  "2021-12-31"
+ ],
+ "datasets": {
+  "prism": {
+   "label": "PRISM 800m (CONUS)",
+   "maps": {
+    "kind": "icechunk",
+    "url": "/data/prism.icechunk",
+    "group": "daily",
+    "cf": true,
+    "variables": {
+     "pr": {
+      "name": "ppt"
+     },
+     "tas": {
+      "name": "tmean"
+     },
+     "tasmax": {
+      "name": "tmax"
+     },
+     "tasmin": {
+      "name": "tmin"
+     },
+     "tdps": {
+      "name": "tdmean"
+     },
+     "rsds": {
+      "name": "soltotal"
+     }
+    }
+   },
+   "series": "maps",
+   "day_window": "24 h ending 12:00 UTC on the labelled date",
+   "common": {
+    "kind": "icechunk",
+    "url": "/data/prism.icechunk",
+    "group": "common_0p25/daily"
+   },
+   "variables": [
+    "pr",
+    "rsds",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
+   ]
+  },
+  "chirps": {
+   "label": "CHIRPS v3 0.05\u00b0 (land 60N\u201360S)",
+   "maps": {
+    "kind": "icechunk",
+    "url": "/data/chirps.icechunk",
+    "group": "daily",
+    "variables": {
+     "pr": {
+      "name": "pr"
+     }
+    }
+   },
+   "series": {
+    "kind": "icechunk",
+    "url": "https://dynamical-ucsb-chc-chirps.s3.us-west-2.amazonaws.com/ucsb-chc-chirps-analysis-final/v0.1.0.icechunk",
+    "group": "",
+    "variables": {
+     "pr": {
+      "name": "precipitation_surface",
+      "scale": 86400.0
+     }
+    },
+    "time": "daily",
+    "lat": "latitude",
+    "lon": "longitude"
+   },
+   "day_window": "UTC day (dynamical.org CHIRPS v3 final daily; CHIRPS pentad totals split into days with ERA5)",
+   "common": {
+    "kind": "icechunk",
+    "url": "/data/chirps.icechunk",
+    "group": "common_0p25/daily"
+   },
+   "variables": [
+    "pr"
+   ]
+  },
+  "era5": {
+   "label": "ERA5 0.25\u00b0",
+   "maps": {
+    "kind": "icechunk",
+    "url": "/data/era5.icechunk",
+    "group": "daily",
+    "variables": {
+     "pr": {
+      "name": "pr"
+     },
+     "tas": {
+      "name": "tas"
+     },
+     "tasmax": {
+      "name": "tasmax"
+     },
+     "tasmin": {
+      "name": "tasmin"
+     },
+     "tdps": {
+      "name": "tdps"
+     },
+     "ps": {
+      "name": "ps"
+     },
+     "rsds": {
+      "name": "rsds"
+     },
+     "sfcWind": {
+      "name": "sfcWind"
+     },
+     "sm1": {
+      "name": "sm1"
+     },
+     "sm2": {
+      "name": "sm2"
+     }
+    }
+   },
+   "series": "maps",
+   "hourly_series": {
+    "kind": "icechunk",
+    "url": "https://earthmover-icechunk-era5.s3.us-east-1.amazonaws.com/icechunkV2",
+    "group": "single/temporal",
+    "note": "hourly; pcodec",
+    "time": "valid_time",
+    "lat": "latitude",
+    "lon": "longitude"
+   },
+   "day_window": "UTC day (00-24 UTC)",
+   "common": {
+    "kind": "icechunk",
+    "url": "/data/era5.icechunk",
+    "group": "common_0p25/daily"
+   },
+   "variables": [
+    "pr",
+    "ps",
+    "rsds",
+    "sfcWind",
+    "sm1",
+    "sm2",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
+   ]
+  },
+  "era5land": {
+   "label": "ERA5-Land 0.1\u00b0",
+   "maps": {
+    "kind": "icechunk",
+    "url": "/data/era5land.icechunk",
+    "group": "daily",
+    "variables": {
+     "tas": {
+      "name": "tas"
+     },
+     "tasmax": {
+      "name": "tasmax"
+     },
+     "tasmin": {
+      "name": "tasmin"
+     },
+     "tdps": {
+      "name": "tdps"
+     },
+     "ps": {
+      "name": "ps"
+     },
+     "sm1": {
+      "name": "sm1"
+     },
+     "sm2": {
+      "name": "sm2"
+     },
+     "pr": {
+      "name": "pr"
+     },
+     "rsds": {
+      "name": "rsds"
+     }
+    }
+   },
+   "series": "maps",
+   "hourly_series": {
+    "kind": "zarr2",
+    "url": "https://arco.datastores.ecmwf.int/cadl-arco-geo-009/arco/reanalysis_era5_land/sfc-pressure-precipitation/geoChunked.zarr",
+    "auth": "cds",
+    "variables": {
+     "pr": {
+      "name": "tp",
+      "scale": 1000.0
+     }
+    },
+    "time": "time",
+    "lat": "latitude",
+    "lon": "longitude",
+    "note": "hourly tp, CDS key (dev only)"
+   },
+   "day_window": "UTC day (00-24 UTC)",
+   "common": {
+    "kind": "icechunk",
+    "url": "/data/era5land.icechunk",
+    "group": "common_0p25/daily"
+   },
+   "variables": [
+    "pr",
+    "ps",
+    "rsds",
+    "sm1",
+    "sm2",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
+   ]
+  },
+  "merra2": {
+   "label": "MERRA-2 0.5\u00b0\u00d70.625\u00b0 (NASA POWER)",
+   "maps": {
+    "kind": "zarr2",
+    "url": "https://nasa-power.s3.us-west-2.amazonaws.com/merra2/spatial/power_merra2_daily_spatial_utc.zarr",
+    "consolidated": true,
+    "variables": {
+     "pr": {
+      "name": "PRECTOTCORR"
+     },
+     "tas": {
+      "name": "T2M"
+     },
+     "tasmax": {
+      "name": "T2M_MAX"
+     },
+     "tasmin": {
+      "name": "T2M_MIN"
+     },
+     "tdps": {
+      "name": "T2MDEW"
+     },
+     "ps": {
+      "name": "PS"
+     },
+     "sfcWind": {
+      "name": "WS10M"
+     },
+     "sm1": {
+      "name": "GWETTOP"
+     },
+     "sm2": {
+      "name": "GWETROOT"
+     }
+    },
+    "time": "time"
+   },
+   "series": {
+    "kind": "zarr2",
+    "url": "https://nasa-power.s3.us-west-2.amazonaws.com/merra2/temporal/power_merra2_daily_temporal_utc.zarr",
+    "consolidated": true,
+    "variables": {
+     "pr": {
+      "name": "PRECTOTCORR"
+     },
+     "tas": {
+      "name": "T2M"
+     },
+     "tasmax": {
+      "name": "T2M_MAX"
+     },
+     "tasmin": {
+      "name": "T2M_MIN"
+     },
+     "tdps": {
+      "name": "T2MDEW"
+     },
+     "ps": {
+      "name": "PS"
+     },
+     "sfcWind": {
+      "name": "WS10M"
+     },
+     "sm1": {
+      "name": "GWETTOP"
+     },
+     "sm2": {
+      "name": "GWETROOT"
+     }
+    },
+    "time": "time"
+   },
+   "day_window": "UTC day (NASA POWER, MERRA-2)",
+   "common": {
+    "kind": "icechunk",
+    "url": "/data/merra2.icechunk",
+    "group": "common_0p25/daily"
+   },
+   "variables": [
+    "pr",
+    "ps",
+    "sfcWind",
+    "sm1",
+    "sm2",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
+   ]
+  },
+  "imerg": {
+   "label": "IMERG Final 0.1\u00b0 (NASA POWER)",
+   "maps": {
+    "kind": "zarr2",
+    "url": "https://nasa-power.s3.us-west-2.amazonaws.com/imerg/spatial/power_imerg_daily_spatial_utc.zarr",
+    "consolidated": true,
+    "variables": {
+     "pr": {
+      "name": "IMERG_PRECTOT"
+     }
+    },
+    "time": "time"
+   },
+   "series": {
+    "kind": "zarr2",
+    "url": "https://nasa-power.s3.us-west-2.amazonaws.com/imerg/temporal/power_imerg_daily_temporal_utc.zarr",
+    "consolidated": true,
+    "variables": {
+     "pr": {
+      "name": "IMERG_PRECTOT"
+     }
+    },
+    "time": "time"
+   },
+   "day_window": "UTC day (NASA POWER, IMERG Final)",
+   "common": {
+    "kind": "icechunk",
+    "url": "/data/imerg.icechunk",
+    "group": "common_0p25/daily"
+   },
+   "variables": [
+    "pr"
+   ]
+  }
+ }
+}

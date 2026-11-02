@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Rendering bake-off: deck.gl-zarr vs zarr-layer</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 12px; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+      .map { height: 360px; border: 1px solid #ccc; }
+      h3 { margin: 4px 0; font-size: 14px; }
+      pre#log { background: #f6f6f6; padding: 8px; font-size: 12px; max-height: 200px; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <h2>Rendering bake-off</h2>
+    <div class="row"><h3>deck.gl-zarr — PRISM pr 2021-10-10</h3><h3>zarr-layer — PRISM pr 2021-10-10</h3>
+      <div id="prism-deck" class="map"></div><div id="prism-carbon" class="map"></div></div>
+    <div class="row"><h3>deck.gl-zarr — ERA5 tas 2021-07-01</h3><h3>zarr-layer — ERA5 tas 2021-07-01</h3>
+      <div id="era5-deck" class="map"></div><div id="era5-carbon" class="map"></div></div>
+    <div class="row"><h3>deck.gl-zarr — ERA5 − MERRA-2 pr (common grid, two repos)</h3><h3>zarr-layer — not expressible (one store/variable per layer)</h3>
+      <div id="diff-deck" class="map"></div><div></div></div>
+    <pre id="log"></pre>
+    <script type="module" src="/src/bakeoff.ts"></script>
+  </body>
+</html>

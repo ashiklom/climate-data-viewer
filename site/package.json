@@ -1,0 +1,42 @@
+{
+  "name": "climate-compare-site",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Local prototype: compare PRISM, CHIRPS, ERA5, ERA5-Land, MERRA-2 and IMERG daily data in the browser",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@carbonplan/zarr-layer": "0.11.0",
+    "@climate-mirror/pco-wasm": "file:../packages/pco-wasm",
+    "@deck.gl/core": "9.4.1",
+    "@deck.gl/geo-layers": "9.4.1",
+    "@deck.gl/layers": "9.4.1",
+    "@deck.gl/mapbox": "9.4.1",
+    "@deck.gl/mesh-layers": "9.4.1",
+    "@developmentseed/deck.gl-raster": "0.9.0",
+    "@developmentseed/deck.gl-zarr": "0.9.0",
+    "@luma.gl/core": "9.4.2",
+    "@luma.gl/shadertools": "9.4.2",
+    "@observablehq/plot": "0.6.17",
+    "icechunk-js": "0.6.1",
+    "maplibre-gl": "5.24.0",
+    "zarrita": "0.7.5"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tsconfig/svelte": "^5.0.6",
+    "playwright-core": "^1.64.1",
+    "smol-toml": "^1.4.2",
+    "svelte": "^5.46.4",
+    "svelte-check": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "^4.0.6"
+  }
+}
