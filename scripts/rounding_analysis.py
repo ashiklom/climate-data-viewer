@@ -1,7 +1,8 @@
 """Quantify the difference between PRISM source float32 values and harmonized decimal values.
 
 PRISM grids hold exact decimal quantities (3 or 4 decimals) but were written to float32 in
-different ways: float32(k / 10^d) ("div") or float32(k) * float32(10^-d) ("mul"). The mirror
+different ways: float32(k / 10^d) ("div") or float32(k) * float32(10^-d) ("mul"); some older
+daily ppt grids also hold unrounded values ("other"), which get rounded to 1e-4. The mirror
 stores the integer k (in 1e-4 units) and decodes to the canonical float32(k / 10^4), i.e. the
 float32 nearest to the decimal value. This script measures, per sampled grid, what that changes:
 absolute/relative/ulp differences, systematic bias, effect on accumulated totals, and how often
@@ -52,6 +53,8 @@ def analyze(job):
         "n_valid": xs.size, "frac_changed": float(np.mean(ulp != 0)), "max_abs_ulp": int(np.abs(ulp).max()),
         "max_abs_diff": float(np.abs(diff).max()), "max_rel_diff": float(rel.max()),
         "mean_signed_rel_diff": float(np.mean(diff[nz] / c[nz])) if nz.any() else 0.0,
+        "mean_signed_abs_diff": float(np.mean(diff)),
+        "frac_quantized": float(np.mean(np.abs(ulp) > 1)),  # moved by more than float32 noise
         "frac_up": float(np.mean(ulp > 0)), "frac_down": float(np.mean(ulp < 0)),
         # Domain total (e.g. CONUS-summed precipitation), summed in float64.
         "domain_sum_rel_diff": float(xs.astype(np.float64).sum() / c.astype(np.float64).sum() - 1) if c.any() else 0.0,
@@ -81,6 +84,7 @@ def main() -> None:
     print(g.agg(
         grids=("date", "size"), frac_changed=("frac_changed", "mean"), max_ulp=("max_abs_ulp", "max"),
         max_abs_diff=("max_abs_diff", "max"), max_rel_diff=("max_rel_diff", "max"),
+        frac_quantized=("frac_quantized", "mean"), mean_signed_abs=("mean_signed_abs_diff", "mean"),
         mean_signed_rel=("mean_signed_rel_diff", "mean"), domain_sum_rel=("domain_sum_rel_diff", "mean"),
         flips=("threshold_flips", "sum"), zeros_ok=("zero_preserved", "all"),
     ).to_string(float_format=lambda v: f"{v:.3g}"))

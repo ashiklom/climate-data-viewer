@@ -51,7 +51,7 @@ def main() -> None:
         for var in VARIABLES:
             da = ds[var]
             packed = "+" in ds.attrs["prism_mirror_codec"]  # cf-* integer packing
-            worst_ulp = 0
+            worst = 0.0
             for i in check_idx:
                 got = da.isel(time=i).values
                 src = read_grid(var, F, dates[i].date()).data
@@ -59,11 +59,10 @@ def main() -> None:
                 if not same_bits(ref, got):
                     raise AssertionError(f"{fname}/{var} {dates[i].date()}: values differ from expected")
                 ok = ~np.isnan(src)
-                worst_ulp = max(worst_ulp, int(np.abs(src[ok].view(np.int32).astype(np.int64) - got[ok].view(np.int32).astype(np.int64)).max()))
+                worst = max(worst, float(np.abs(got[ok].astype(np.float64) - src[ok]).max(initial=0)))
                 assert not (got == np.float32(NODATA)).any()
-            assert worst_ulp <= 1, worst_ulp
             print(f"[{fname}] {var}: {len(check_idx)} dates match {'harmonized source' if packed else 'source bit-for-bit'} "
-                  f"(max {worst_ulp} ulp from source float32); decoded {da.dtype}")
+                  f"(max |stored - source| {worst:.2g}); decoded {da.dtype}")
 
         # Read timing on the local store (no network): one full map vs one pixel's sampled series.
         var = "tmax"

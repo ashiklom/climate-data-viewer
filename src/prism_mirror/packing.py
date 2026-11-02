@@ -1,15 +1,16 @@
 """Harmonized CF integer packing (scale_factor / add_offset) of PRISM float32 grids.
 
-PRISM values are exact decimal quantities (3 decimals, a few tmin grids 4), but individual
-grids were written to float32 in different ways:
+Almost all PRISM values are exact decimal quantities (3 decimals, a few tmin grids 4), but
+individual grids were written to float32 in different ways:
   * "div-3":  x == float32(k / 1000)
   * "mul-3":  x == float32(k) * float32(0.001)   (float32(0.001) is ~4.7e-8 too large)
   * "mul-4":  x == float32(k) * float32(0.0001)
 The "mul" forms differ from the float32 nearest the decimal value by at most 1 ulp.
-We store the decimal integer k (in 1e-4 units) and let CF decoding return one consistent
-float32 per decimal value. pack() refuses any grid where that would move a value by more than
-1 ulp, so the harmonization never touches information above float32 noise level
-(see scripts/rounding_analysis.py for the measured effect).
+Some older daily ppt grids also contain unrounded values ("other"); those are rounded to the
+nearest 1e-4 mm (error <= 5e-5 mm, unbiased), far below the 0.254 mm gauge resolution.
+We store the integer k (in 1e-4 units) and let CF decoding return one consistent float32 per
+decimal value. pack() refuses any grid where a value would move by more than half a quantum
+plus 1 ulp (see scripts/rounding_analysis.py for the measured effect).
 """
 
 from __future__ import annotations
@@ -22,11 +23,6 @@ from prism_mirror.catalog import VARIABLES
 
 DECIMALS = 4
 SCALE = 10.0**-DECIMALS
-MAX_ULP = 1
-
-
-def _ulp_diff(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    return a.view(np.int32).astype(np.int64) - b.view(np.int32).astype(np.int64)
 
 
 def cf_attrs(var: str, kind: str = "cf-uint") -> tuple[np.dtype, dict]:
@@ -65,16 +61,23 @@ def canonical(data: np.ndarray, var: str = "ppt", kind: str = "cf-uint") -> np.n
 
 
 def pack(data: np.ndarray, var: str, kind: str = "cf-uint") -> tuple[np.ndarray, dict]:
-    """Encode float32 `data` (NaN = missing) to integers, guaranteeing |decoded - data| <= 1 ulp."""
+    """Encode float32 `data` (NaN = missing) to integers.
+
+    Guarantees |decoded - data| <= SCALE / 2 + 1 ulp: decimal values move by at most float32 noise,
+    unrounded values are rounded to the nearest SCALE.
+    """
     _, attrs = cf_attrs(var, kind)
     ints = encode(data, var, kind)
     back = decode(ints, attrs)
     nan = np.isnan(data)
     if not np.array_equal(nan, np.isnan(back)):
         raise ValueError(f"{var}: missing-value mask changed by packing")
-    worst = np.abs(_ulp_diff(data[~nan], back[~nan])).max(initial=0)
-    if worst > MAX_ULP:
-        raise ValueError(f"{var}: harmonized packing would move a value by {worst} ulp (> {MAX_ULP})")
+    src, out = data[~nan], back[~nan]
+    ulp = np.abs(np.spacing(src)).astype(np.float64)
+    excess = np.abs(out.astype(np.float64) - src) - (SCALE / 2 + ulp)
+    if excess.size and excess.max() > 0:
+        i = int(np.argmax(excess))
+        raise ValueError(f"{var}: packing would move {src[i]!r} to {out[i]!r} (> {SCALE / 2:g} + 1 ulp)")
     return ints, attrs
 
 
