@@ -72,13 +72,31 @@ export function cfDecode(data: ArrayLike<number>, attrs: Record<string, unknown>
   return out;
 }
 
-/** Index of `date` (YYYY-MM-DD) on a contiguous daily `time` coordinate ("days since ..." units). */
-export async function dayIndex(group: zarr.Group<zarr.Readable>, date: string, timeName = "time"): Promise<number> {
-  const t = await zarr.open(group.resolve(timeName), { kind: "array" });
+const UNIT_MS: Record<string, number> = { seconds: 1000, minutes: 60000, hours: 3600000, days: 86400000 };
+
+export type TimeAxis = { originMs: number; unitMs: number; first: number; step: number; length: number };
+
+/** Read a regular CF time coordinate ("<unit> since <date>") as origin, first value and step. */
+export async function timeAxis(group: zarr.Group<zarr.Readable>, name = "time"): Promise<TimeAxis> {
+  const t = await zarr.open(group.resolve(name), { kind: "array" });
   const units = String((t.attrs as Record<string, unknown>).units ?? "");
-  const m = /days since (\d{4}-\d{2}-\d{2})/.exec(units);
-  if (!m) throw new Error(`unsupported time units: ${units}`);
-  const first = (await zarr.get(t, [0])) as unknown as number | bigint;
-  const days = (Date.parse(date) - Date.parse(m[1]!)) / 86400000;
-  return days - Number(first);
+  const m = /^(\w+) since (\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}(?::\d{2})?))?/.exec(units);
+  if (!m || !UNIT_MS[m[1]!]) throw new Error(`unsupported time units: ${units}`);
+  const two = await zarr.get(t, [zarr.slice(0, 2)]);
+  const [a, b] = Array.from(two.data as ArrayLike<number | bigint>, Number);
+  return {
+    originMs: Date.parse(`${m[2]}T${m[3] ?? "00:00"}Z`), unitMs: UNIT_MS[m[1]!]!,
+    first: a!, step: b! - a!, length: t.shape[0]!,
+  };
+}
+
+/** Index on a regular time axis of the instant `iso` (e.g. "2021-07-01" = its 00:00 UTC). */
+export function indexOf(ax: TimeAxis, iso: string): number {
+  const v = (Date.parse(iso.length === 10 ? `${iso}T00:00Z` : iso) - ax.originMs) / ax.unitMs;
+  return Math.round((v - ax.first) / ax.step);
+}
+
+/** Index of `date` (YYYY-MM-DD) on a contiguous daily `time` coordinate. */
+export async function dayIndex(group: zarr.Group<zarr.Readable>, date: string, timeName = "time"): Promise<number> {
+  return indexOf(await timeAxis(group, timeName), date);
 }
