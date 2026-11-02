@@ -1,0 +1,23 @@
+{
+  "name": "@climate-mirror/pco-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Decode-only pcodec (numcodecs.pcodec) for zarrita in the browser, compiled from the pco crate to WebAssembly",
+  "exports": {
+    ".": "./js/index.js"
+  },
+  "files": ["js", "pkg/pco_wasm.js", "pkg/pco_wasm_bg.wasm", "pkg/pco_wasm.d.ts"],
+  "scripts": {
+    "build": "wasm-pack build --release --target web --out-dir pkg",
+    "fixtures": "cd ../.. && uv run python packages/pco-wasm/tests/make_fixtures.py && uv run python packages/pco-wasm/tests/make_zarrita_expected.py",
+    "test": "node --test tests/golden.test.mjs tests/zarrita.test.mjs"
+  },
+  "peerDependencies": {
+    "zarrita": "^0.7.5"
+  },
+  "devDependencies": {
+    "icechunk-js": "0.6.1",
+    "zarrita": "0.7.5"
+  }
+}
