@@ -44,7 +44,7 @@ def main() -> None:
     args = p.parse_args()
     repo = storage.open_mirror("era5land", create=True)
     init_daily_group(
-        repo, "daily", era5land.GRID, *era5land.RECORD, era5land.CANONICAL_VARS,
+        repo, "daily", era5land.GRID, *era5land.RECORD, era5land.CANONICAL_VARS, chunks=(1, 901, 1800),
         attrs={
             "title": "ERA5-Land daily canonical variables (UTC days)",
             "source": "Copernicus CDS: derived-era5-land-daily-statistics (tas, tasmax, tasmin, tdps, ps, sm1, sm2); "
