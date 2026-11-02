@@ -1,0 +1,75 @@
+# Where each Icechunk repo / Zarr store lives. Single source of truth for Python (climate_mirror.storage)
+# and the website (scripts/web/write_sources.py generates site/src/sources.generated.json from this file).
+#
+# [mirrors.<name>]   repos we build. target = "local" (under local_root) or "s3" (any S3-compatible API:
+#                    AWS S3, Wasabi, Open Storage Network, Source Cooperative). Write credentials come from the
+#                    environment (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY), never from this file.
+#                    For the website, an s3 target must allow anonymous GET + Range and CORS; set public_url to
+#                    the HTTPS base the browser should use (path-style for OSN/Wasabi).
+# [external.<name>]  stores maintained by others that we read.
+#
+# Example S3-compatible mirror target:
+#   [mirrors.prism]
+#   target = "s3"
+#   bucket = "my-bucket"
+#   prefix = "climate-mirror/prism.icechunk"
+#   region = "us-east-1"
+#   endpoint_url = "https://s3.wasabisys.com"   # omit for AWS
+#   force_path_style = true
+#   public_url = "https://s3.wasabisys.com/my-bucket/climate-mirror/prism.icechunk"
+
+[defaults]
+local_root = "data/stores"
+
+[mirrors.prism]
+target = "local"
+
+[mirrors.chirps]
+target = "local"
+
+[mirrors.era5]
+target = "local"
+
+[mirrors.era5land]
+target = "local"
+
+[mirrors.merra2]
+target = "local"
+
+[mirrors.imerg]
+target = "local"
+
+[external.era5_earthmover]
+# Earthmover "ERA5" exchange listing 6a19bcfe9aa6e97720a2fad2 (earthmover-public, CC-BY-4.0).
+kind = "icechunk"
+bucket = "earthmover-icechunk-era5"
+prefix = "icechunkV2"
+region = "us-east-1"
+anonymous = true
+public_url = "https://earthmover-icechunk-era5.s3.us-east-1.amazonaws.com/icechunkV2"
+
+[external.chirps_dynamical]
+# dynamical.org CHIRPS v3 daily final (Earthmover listing 6ad111f3549593cb0581ec6f).
+kind = "icechunk"
+bucket = "dynamical-ucsb-chc-chirps"
+prefix = "ucsb-chc-chirps-analysis-final/v0.1.0.icechunk"
+region = "us-west-2"
+anonymous = true
+public_url = "https://dynamical-ucsb-chc-chirps.s3.us-west-2.amazonaws.com/ucsb-chc-chirps-analysis-final/v0.1.0.icechunk"
+
+[external.merra2_power]
+kind = "zarr"
+spatial_url = "https://nasa-power.s3.us-west-2.amazonaws.com/merra2/spatial/power_merra2_daily_spatial_utc.zarr"
+temporal_url = "https://nasa-power.s3.us-west-2.amazonaws.com/merra2/temporal/power_merra2_daily_temporal_utc.zarr"
+
+[external.imerg_power]
+kind = "zarr"
+spatial_url = "https://nasa-power.s3.us-west-2.amazonaws.com/imerg/spatial/power_imerg_daily_spatial_utc.zarr"
+temporal_url = "https://nasa-power.s3.us-west-2.amazonaws.com/imerg/temporal/power_imerg_daily_temporal_utc.zarr"
+
+[external.era5land_arco]
+# ECMWF ERA5-Land ARCO (needs the CDS API key as a Bearer token; local prototype only).
+kind = "zarr"
+geo_url = "https://arco.datastores.ecmwf.int/cadl-arco-geo-009/arco/reanalysis_era5_land/sfc-pressure-precipitation/geoChunked.zarr"
+time_url = "https://arco.datastores.ecmwf.int/cadl-arco-time-009/arco/reanalysis_era5_land/sfc-pressure-precipitation/timeChunked.zarr"
+auth = "cds_api_key"
