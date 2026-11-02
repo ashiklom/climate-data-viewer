@@ -8,6 +8,7 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "cast-value-rs>=0.5.1",
+    "dask>=2026.8.0",
     "httpx>=0.28.1",
     "icechunk>=2.3.1",
     "numcodecs[pcodec]>=0.17.1",

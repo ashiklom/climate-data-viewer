@@ -21,7 +21,8 @@ def open_prism(group: str = "daily", store: str | Path = DEFAULT_STORE, branch: 
     nearest each PRISM decimal value) at half the memory.
     """
     repo = icechunk.Repository.open(icechunk.local_filesystem_storage(str(store)))
-    ds = xr.open_zarr(repo.readonly_session(branch).store, group=group, consolidated=False)
+    # Dask-backed (store chunks) so the float32 cast below stays lazy; without it the cast loads every variable.
+    ds = xr.open_zarr(repo.readonly_session(branch).store, group=group, consolidated=False, chunks={})
     for var in VARIABLES:
         if var in ds and ds[var].dtype != np.float32:
             ds[var] = ds[var].astype(np.float32, keep_attrs=True)
