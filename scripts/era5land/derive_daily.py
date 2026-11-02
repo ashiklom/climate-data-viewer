@@ -56,8 +56,15 @@ def main() -> None:
         },
     )
     for month in pd.period_range(args.start, args.end, freq="M"):
-        fields = {f.canonical: load_field(f, month) for f in era5land.FIELDS}
-        write_days(repo, "daily", fields, f"daily: {month} from CDS")
+        # write whatever fields are cached (CDS requests finish at different times); rerun later for the rest
+        ready = [f for f in era5land.FIELDS
+                 if era5land.cache_file(f, str(month)).exists()
+                 and (f.statistic or era5land.cache_file(f, str(month + 1)).exists())]
+        if not ready:
+            print(f"{month}: nothing cached yet", flush=True)
+            continue
+        fields = {f.canonical: load_field(f, month) for f in ready}
+        write_days(repo, "daily", fields, f"daily: {month} ({', '.join(fields)}) from CDS")
         print(f"{month}: wrote {', '.join(fields)}", flush=True)
 
 
