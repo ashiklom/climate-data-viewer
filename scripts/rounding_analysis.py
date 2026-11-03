@@ -35,7 +35,7 @@ def analyze(job):
     c = canonical(xs, ds.variables[var].valid_range)
     ulp = xs.view(np.int32).astype(np.int64) - c.view(np.int32).astype(np.int64)
     diff = xs.astype(np.float64) - c.astype(np.float64)
-    nz = xs != 0
+    nz = (xs != 0) & (c != 0)  # relative differences only where both are nonzero (tiny values may round to 0)
     rel = np.abs(diff[nz] / c[nz].astype(np.float64)) if nz.any() else np.zeros(1)
     row = {
         "var": var, "freq": fname, "date": str(d), "style": classify_style(xs),
@@ -48,6 +48,7 @@ def analyze(job):
         # Domain total (e.g. CONUS-summed precipitation), summed in float64.
         "domain_sum_rel_diff": float(xs.astype(np.float64).sum() / c.astype(np.float64).sum() - 1) if c.any() else 0.0,
         "zero_preserved": bool(np.array_equal(xs == 0, c == 0)),
+        "n_to_zero": int(np.sum((xs != 0) & (c == 0))),
     }
     flips = 0
     for t in ds.thresholds.get(var, []):
@@ -86,7 +87,7 @@ def main() -> None:
         max_abs_diff=("max_abs_diff", "max"), max_rel_diff=("max_rel_diff", "max"),
         frac_quantized=("frac_quantized", "mean"), mean_signed_abs=("mean_signed_abs_diff", "mean"),
         mean_signed_rel=("mean_signed_rel_diff", "mean"), domain_sum_rel=("domain_sum_rel_diff", "mean"),
-        flips=("threshold_flips", "sum"), zeros_ok=("zero_preserved", "all"),
+        flips=("threshold_flips", "sum"), zeros_ok=("zero_preserved", "all"), to_zero=("n_to_zero", "sum"),
     ).to_string(float_format=lambda v: f"{v:.3g}"))
 
 
