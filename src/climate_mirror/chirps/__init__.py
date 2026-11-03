@@ -3,7 +3,8 @@
 - Daily: read from dynamical.org's Icechunk copy (stores.toml [external.chirps_dynamical]; ERA5-split
   pentads, 8-bit mantissa rounding, time-optimized chunks); we keep a map-optimized copy in our `chirps`
   mirror (group `daily`) for the website.
-- Native pentads/dekads/monthly from CHC: see docs/chirps.md (subset mirror; CHC server availability).
+- Native pentads/dekads/monthly from CHC GeoTIFFs: groups `pentads`, `dekads`, `monthly` (catalog.py, io.py,
+  scripts/chirps/build_store.py); see docs/chirps.md.
 """
 
 from __future__ import annotations
