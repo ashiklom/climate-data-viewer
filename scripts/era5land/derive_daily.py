@@ -1,4 +1,5 @@
-"""Write ERA5-Land daily canonical variables from cached CDS NetCDFs into the `era5land` mirror (group `daily`).
+"""Write the CDS-sourced ERA5-Land daily variables (all but pr; see climate_mirror.era5land) from cached NetCDFs
+into the `era5land` mirror (group `daily`).
 
   uv run python scripts/era5land/derive_daily.py --start 2021-01 --end 2021-12
 """
@@ -24,7 +25,7 @@ def load_field(f: era5land.Field, month: pd.Period) -> xr.DataArray:
     else:
         # 00 UTC accumulations: value at D+1 00:00 is the total over day D.
         both = xr.concat(
-            [xr.open_dataset(era5land.cache_file(f, str(m)))[["tp" if f.variable == "total_precipitation" else "ssrd"]]
+            [xr.open_dataset(era5land.cache_file(f, str(m)))[["ssrd"]]
              for m in (month, month + 1)],
             dim="valid_time",
         )
@@ -43,18 +44,8 @@ def main() -> None:
     p.add_argument("--end", required=True, help="YYYY-MM")
     args = p.parse_args()
     repo = storage.open_mirror("era5land", create=True)
-    init_daily_group(
-        repo, "daily", era5land.GRID, *era5land.RECORD, era5land.CANONICAL_VARS, chunks=(1, 901, 1800),
-        attrs={
-            "title": "ERA5-Land daily canonical variables (UTC days)",
-            "source": "Copernicus CDS: derived-era5-land-daily-statistics (tas, tasmax, tasmin, tdps, ps, sm1, sm2); "
-                      "reanalysis-era5-land at 00 UTC (pr, rsds: 24 h accumulations ending at D+1 00 UTC)",
-            "institution": "ECMWF / Copernicus Climate Change Service",
-            "license": "CC-BY-4.0",
-            "comment": "Daily statistics are ECMWF's UTC-day aggregates of hourly ERA5-Land. Longitudes rolled to "
-                       "-180..180. sfcWind is not provided (see climate_mirror.era5land).",
-        },
-    )
+    init_daily_group(repo, "daily", era5land.GRID, *era5land.RECORD, era5land.CANONICAL_VARS, chunks=era5land.CHUNKS,
+                     attrs=era5land.GROUP_ATTRS)
     for month in pd.period_range(args.start, args.end, freq="M"):
         # write whatever fields are cached (CDS requests finish at different times); rerun later for the rest
         ready = [f for f in era5land.FIELDS

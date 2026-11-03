@@ -1,4 +1,4 @@
-"""Fetch ERA5-Land daily fields from the CDS API into the permanent cache (one file per field and month).
+"""Fetch the CDS-sourced ERA5-Land daily fields (see climate_mirror.era5land for why these use CDS) from the CDS API into the permanent cache (one file per field and month).
 
 Cached files are never re-requested. Accumulated fields (00 UTC) also fetch the month after --end, whose
 first day holds the total for the last day of --end's month.
@@ -35,7 +35,7 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--start", required=True, help="YYYY-MM")
     p.add_argument("--end", required=True, help="YYYY-MM")
-    p.add_argument("--fields", nargs="*", default=era5land.CANONICAL_VARS)
+    p.add_argument("--fields", nargs="*", default=era5land.CDS_VARS)
     p.add_argument("--workers", type=int, default=4)
     args = p.parse_args()
     months = pd.period_range(args.start, args.end, freq="M")
