@@ -50,7 +50,7 @@ class Dataset(Protocol):
     def source_exists(self, var: str, freq: Frequency, date: dt.date) -> bool: ...
 
 
-DATASETS = {"prism": "climate_mirror.prism.adapter"}
+DATASETS = {"prism": "climate_mirror.prism.adapter", "chirps": "climate_mirror.chirps.adapter"}
 
 
 def get(name: str) -> Dataset:
