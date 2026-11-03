@@ -60,10 +60,13 @@ def main() -> None:
         "era5land": {
             "label": "ERA5-Land 0.1°",
             "maps": {"kind": "icechunk", "url": mirror_url("era5land"), "group": "daily", "variables": identity(era5land.CANONICAL_VARS)},
-            "series": "maps",
-            "hourly_series": {"kind": "zarr2", "url": ext("era5land_arco")["geo_url"], "auth": "cds",
-                              "variables": {"pr": {"name": "tp", "scale": 1000.0}}, "time": "time",
-                              "lat": "latitude", "lon": "longitude", "note": "hourly tp, CDS key (dev only)"},
+            # Point series: ARCO geo-chunked stores (hourly; aggregated to UTC days in the browser like ERA5).
+            "series": {"kind": "arco_hourly", "auth": "cds", "time": "time", "lat": "latitude", "lon": "longitude",
+                       "stores": {v: era5land.ARCO[store]["geo"] for store, vs in {
+                           "pressure-precipitation": ["tp", "sp"], "2m-temperature": ["t2m", "d2m"],
+                           "wind": ["u10", "v10"], "soil-water": ["swvl1", "swvl2"], "radiation-heat": ["ssrd"]}.items()
+                           for v in vs}},
+            "series_variables": [*era5land.CANONICAL_VARS, "sfcWind"],
         },
         "merra2": {
             "label": "MERRA-2 0.5°×0.625° (NASA POWER)",
@@ -84,6 +87,7 @@ def main() -> None:
         d["day_window"] = DAY_WINDOW[name]
         d["common"] = {"kind": "icechunk", "url": mirror_url(name), "group": COMMON}
         d["variables"] = sorted(d["maps"]["variables"])
+        d["series_variables"] = sorted(d.get("series_variables", d["variables"]))
     out = {
         "canonical": {k: asdict(v) for k, v in CANONICAL.items()},
         "common_grid": {"res": era5.GRID.res, "north": era5.GRID.north, "west": era5.GRID.west,

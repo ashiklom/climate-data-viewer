@@ -103,9 +103,10 @@
     point = { lon, lat };
     seriesStatus = "loading series…";
     const t0 = performance.now();
-    const results = await Promise.allSettled(available.map((d) => pointSeries(d, variable, lon, lat, PERIOD_START, PERIOD_END)));
+    const withSeries = DATASETS.filter((d) => (sources.datasets[d].series_variables as string[]).includes(variable));
+    const results = await Promise.allSettled(withSeries.map((d) => pointSeries(d, variable, lon, lat, PERIOD_START, PERIOD_END)));
     series = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
-    const failed = results.flatMap((r, i) => (r.status === "rejected" ? [`${available[i]}: ${r.reason}`] : []));
+    const failed = results.flatMap((r, i) => (r.status === "rejected" ? [`${withSeries[i]}: ${r.reason}`] : []));
     seriesStatus = `${series.length} series in ${((performance.now() - t0) / 1000).toFixed(1)} s` + (failed.length ? ` — failed: ${failed.join("; ")}` : "");
     drawChart();
   }

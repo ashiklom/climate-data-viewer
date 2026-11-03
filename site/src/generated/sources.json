@@ -181,6 +181,14 @@
     "tasmax",
     "tasmin",
     "tdps"
+   ],
+   "series_variables": [
+    "pr",
+    "rsds",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
    ]
   },
   "chirps": {
@@ -216,6 +224,9 @@
     "group": "common_0p25/daily"
    },
    "variables": [
+    "pr"
+   ],
+   "series_variables": [
     "pr"
    ]
   },
@@ -285,6 +296,18 @@
     "tasmax",
     "tasmin",
     "tdps"
+   ],
+   "series_variables": [
+    "pr",
+    "ps",
+    "rsds",
+    "sfcWind",
+    "sm1",
+    "sm2",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
    ]
   },
   "era5land": {
@@ -294,6 +317,9 @@
     "url": "/data/era5land.icechunk",
     "group": "daily",
     "variables": {
+     "pr": {
+      "name": "pr"
+     },
      "tas": {
       "name": "tas"
      },
@@ -315,30 +341,41 @@
      "sm2": {
       "name": "sm2"
      },
-     "pr": {
-      "name": "pr"
-     },
      "rsds": {
       "name": "rsds"
      }
     }
    },
-   "series": "maps",
-   "hourly_series": {
-    "kind": "zarr2",
-    "url": "https://arco.datastores.ecmwf.int/cadl-arco-geo-009/arco/reanalysis_era5_land/sfc-pressure-precipitation/geoChunked.zarr",
+   "series": {
+    "kind": "arco_hourly",
     "auth": "cds",
-    "variables": {
-     "pr": {
-      "name": "tp",
-      "scale": 1000.0
-     }
-    },
     "time": "time",
     "lat": "latitude",
     "lon": "longitude",
-    "note": "hourly tp, CDS key (dev only)"
+    "stores": {
+     "tp": "https://arco.datastores.ecmwf.int/cadl-arco-geo-009/arco/reanalysis_era5_land/sfc-pressure-precipitation/geoChunked.zarr",
+     "sp": "https://arco.datastores.ecmwf.int/cadl-arco-geo-009/arco/reanalysis_era5_land/sfc-pressure-precipitation/geoChunked.zarr",
+     "t2m": "https://arco.datastores.ecmwf.int/cadl-arco-geo-007/arco/reanalysis_era5_land/sfc-2m-temperature/geoChunked.zarr",
+     "d2m": "https://arco.datastores.ecmwf.int/cadl-arco-geo-007/arco/reanalysis_era5_land/sfc-2m-temperature/geoChunked.zarr",
+     "u10": "https://arco.datastores.ecmwf.int/cadl-arco-geo-008/arco/reanalysis_era5_land/sfc-wind/geoChunked.zarr",
+     "v10": "https://arco.datastores.ecmwf.int/cadl-arco-geo-008/arco/reanalysis_era5_land/sfc-wind/geoChunked.zarr",
+     "swvl1": "https://arco.datastores.ecmwf.int/cadl-arco-geo-005/arco/reanalysis_era5_land/sfc-soil-water/geoChunked.zarr",
+     "swvl2": "https://arco.datastores.ecmwf.int/cadl-arco-geo-005/arco/reanalysis_era5_land/sfc-soil-water/geoChunked.zarr",
+     "ssrd": "https://arco.datastores.ecmwf.int/cadl-arco-geo-010/arco/reanalysis_era5_land/sfc-radiation-heat/geoChunked.zarr"
+    }
    },
+   "series_variables": [
+    "pr",
+    "ps",
+    "rsds",
+    "sfcWind",
+    "sm1",
+    "sm2",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
+   ],
    "day_window": "UTC day (00-24 UTC)",
    "common": {
     "kind": "icechunk",
@@ -445,6 +482,17 @@
     "tasmax",
     "tasmin",
     "tdps"
+   ],
+   "series_variables": [
+    "pr",
+    "ps",
+    "sfcWind",
+    "sm1",
+    "sm2",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
    ]
   },
   "imerg": {
@@ -478,6 +526,9 @@
     "group": "common_0p25/daily"
    },
    "variables": [
+    "pr"
+   ],
+   "series_variables": [
     "pr"
    ]
   }

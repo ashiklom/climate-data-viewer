@@ -1,7 +1,7 @@
 // Daily point time series per dataset, read from the most time-friendly copy of each dataset:
 //   PRISM: our mirror (32-day chunks); CHIRPS: dynamical.org (365-day chunks); ERA5: Earthmover single/temporal
 //   (hourly, one ~year per chunk; aggregated to UTC days here with the same rules as climate_mirror.era5);
-//   MERRA-2 / IMERG: NASA POWER temporal stores; ERA5-Land: our daily mirror (map chunks; slower).
+//   MERRA-2 / IMERG: NASA POWER temporal stores; ERA5-Land: ECMWF ARCO geo-chunked stores (hourly, CDS key).
 import * as zarr from "zarrita";
 
 import { cfDecode, indexOf, openIcechunkGroup, openZarr2Group, sources, timeAxis, type DatasetName } from "./data";
@@ -45,8 +45,10 @@ async function dailyPoint(group: Grp, key: string, varName: string, lon: number,
   return Array.from(vals, (v) => v * (opts.scale ?? 1));
 }
 
-// ERA5 hourly -> daily, matching climate_mirror.era5.daily.
-const ERA5_RULES: Record<string, { vars: string[]; agg: "sum_acc" | "mean" | "max" | "min"; f: (...x: number[]) => number }> = {
+// Hourly -> UTC-day aggregation, matching climate_mirror.era5.daily (and the ERA5-Land checks against CDS):
+// accumulations (tp, ssrd; hourly increments labelled at the end of each hour) sum hours ending (D 00, D+1 00];
+// instantaneous fields aggregate hours 00..23. ERA5 (Earthmover) and ERA5-Land (ARCO) share variable names.
+const HOURLY_RULES: Record<string, { vars: string[]; agg: "sum_acc" | "mean" | "max" | "min"; f: (...x: number[]) => number }> = {
   pr: { vars: ["tp"], agg: "sum_acc", f: (x) => x * 1000 },
   rsds: { vars: ["ssrd"], agg: "sum_acc", f: (x) => x / 1e6 },
   tas: { vars: ["t2m"], agg: "mean", f: (x) => x - 273.15 },
@@ -59,16 +61,32 @@ const ERA5_RULES: Record<string, { vars: string[]; agg: "sum_acc" | "mean" | "ma
   sm2: { vars: ["swvl2"], agg: "mean", f: (x) => x },
 };
 
-async function era5Point(variable: string, lon: number, lat: number, start: string, end: string): Promise<number[]> {
+/** Where an hourly source variable lives: its group, coordinate/time names, and longitude convention. */
+type HourlyLocator = (v: string) => Promise<{ group: Grp; key: string; time: string; lat: string; lon: string; lon360: boolean }>;
+
+const era5Locator: HourlyLocator = async () => {
   const spec = sources.datasets.era5.hourly_series;
-  const group = await openIcechunkGroup(spec.url, spec.group);
-  const [lats, lons] = await Promise.all([coord(group, "latitude", spec.url), coord(group, "longitude", spec.url)]);
-  const ax = await timeAxis(group, "valid_time");
-  const rule = ERA5_RULES[variable]!;
-  const h0 = indexOf(ax, start), h1 = indexOf(ax, end) + 25; // through end+1 00:00 for accumulations
-  const yi = nearest(lats, lat), xi = nearest(lons, ((lon % 360) + 360) % 360);
+  return { group: await openIcechunkGroup(spec.url, spec.group), key: spec.url, time: "valid_time", lat: "latitude", lon: "longitude", lon360: true };
+};
+
+const era5landLocator: HourlyLocator = async (v) => {
+  const spec = sources.datasets.era5land.series as { stores: Record<string, string>; time: string; lat: string; lon: string };
+  const url = spec.stores[v]!;
+  // ARCO requires the CDS key as a Bearer token (dev server only; see vite.config.ts `virtual:cds-key`).
+  const { default: key } = await import("virtual:cds-key");
+  return { group: await openZarr2Group(url, { Authorization: `Bearer ${key}` }), key: url, time: spec.time, lat: spec.lat, lon: spec.lon, lon360: false };
+};
+
+async function hourlyPoint(locate: HourlyLocator, variable: string, lon: number, lat: number, start: string, end: string): Promise<number[]> {
+  const rule = HOURLY_RULES[variable];
+  if (!rule) throw new Error(`no hourly rule for ${variable}`);
   const hourly = await Promise.all(rule.vars.map(async (v) => {
-    const arr = await zarr.open(group.resolve(v), { kind: "array" });
+    const loc = await locate(v);
+    const [lats, lons] = await Promise.all([coord(loc.group, loc.lat, loc.key), coord(loc.group, loc.lon, loc.key)]);
+    const ax = await timeAxis(loc.group, loc.time);
+    const h0 = indexOf(ax, start), h1 = indexOf(ax, end) + 25; // through end+1 00:00 for accumulations
+    const yi = nearest(lats, lat), xi = nearest(lons, loc.lon360 ? ((lon % 360) + 360) % 360 : lon);
+    const arr = await zarr.open(loc.group.resolve(v), { kind: "array" });
     return (await zarr.get(arr, [zarr.slice(h0, h1), yi, xi])).data as Float32Array;
   }));
   const n = days(start, end).length;
@@ -92,8 +110,11 @@ export async function pointSeries(dataset: DatasetName, variable: string, lon: n
   let values: number[];
   let source: string;
   if (dataset === "era5") {
-    values = await era5Point(variable, lon, lat, start, end);
+    values = await hourlyPoint(era5Locator, variable, lon, lat, start, end);
     source = "Earthmover ERA5 single/temporal (hourly → UTC days)";
+  } else if (dataset === "era5land") {
+    values = await hourlyPoint(era5landLocator, variable, lon, lat, start, end);
+    source = "ECMWF ARCO ERA5-Land geo-chunked (hourly → UTC days)";
   } else if (dataset === "chirps") {
     const s = ds.series as { url: string; variables: Record<string, { name: string; scale: number }> };
     const g = await openIcechunkGroup(s.url, "");
@@ -109,7 +130,7 @@ export async function pointSeries(dataset: DatasetName, variable: string, lon: n
     const m = ds.maps as { url: string; group: string; variables: Record<string, { name: string }> };
     const g = await openIcechunkGroup(m.url, m.group);
     values = await dailyPoint(g, `${m.url}|${m.group}`, m.variables[variable]!.name, lon, lat, start, end);
-    source = dataset === "prism" ? "PRISM mirror (32-day chunks)" : "local daily mirror (map chunks)";
+    source = "PRISM mirror (32-day chunks)";
   }
   return { dataset, dates, values, source };
 }

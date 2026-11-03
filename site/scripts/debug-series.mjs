@@ -1,8 +1,8 @@
 // Run pointSeries for each dataset separately in headless Chrome, reporting time and JS heap.
 import { chromium } from "playwright-core";
-const [variable = "pr", lon = "-72.93", lat = "41.31"] = process.argv.slice(2);
+const [variable = "pr", lon = "-72.93", lat = "41.31", only = ""] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: "chrome", headless: true, args: ["--use-angle=metal", "--enable-precise-memory-info"] });
-for (const ds of ["prism", "chirps", "era5", "era5land", "merra2", "imerg"]) {
+for (const ds of only ? only.split(",") : ["prism", "chirps", "era5", "era5land", "merra2", "imerg"]) {
   const page = await browser.newPage();
   page.on("crash", () => console.log(`  ${ds}: PAGE CRASHED`));
   await page.goto("http://localhost:5173/");
