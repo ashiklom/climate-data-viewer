@@ -33,12 +33,12 @@ def candidates() -> list[tuple[str, str, str, xr.DataArray]]:
     p = mirror("prism", "daily")
     for c, v in PRISM_CROSSWALK.items():
         out.append(("prism", "native", c, p[v].astype(np.float32)))
-    for name in ("era5", "chirps"):
+    for name in ("era5", "era5land", "chirps"):
         ds = mirror(name, "daily")
         for v in ds.data_vars:
             if v != "time_bnds":
                 out.append((name, "native", v, ds[v]))
-    for name in ("era5", "chirps", "merra2", "imerg"):
+    for name in ("prism", "era5", "era5land", "chirps", "merra2", "imerg"):
         try:
             ds = mirror(name, "common_0p25/daily")
         except Exception:
