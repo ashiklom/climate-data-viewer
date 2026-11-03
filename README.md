@@ -6,7 +6,7 @@ local website comparing daily PRISM, CHIRPS, ERA5, ERA5-Land, MERRA-2 and IMERG 
 | Dataset | What we hold | Docs |
 |---|---|---|
 | PRISM 800m (CONUS, daily + monthly, 9 variables) | Full-record mirror with the representative sample and 2021 written; full size estimated at about 1.96 TB | [reports/prism.md](reports/prism.md) |
-| CHIRPS v3 (global 0.05°) | Map-optimized copy of dynamical.org's daily data (2021); native pentad/dekad/monthly subset mirror planned (CHC server down) | [docs/chirps.md](docs/chirps.md) |
+| CHIRPS v3 (global 0.05°) | Native pentad/dekad/monthly subset mirror (5 chunks each + 2021; full size estimated at about 45 GB) and a map-optimized copy of dynamical.org's daily data (2021) | [docs/chirps.md](docs/chirps.md) |
 | ERA5 (0.25°) | Daily canonical variables derived from Earthmover's public hourly ERA5 | `climate_mirror/era5` |
 | ERA5-Land (0.1°) | Daily maps: precipitation from the ECMWF ARCO Zarr stores (hourly sums); other variables from CDS daily statistics (24× less transfer than hourly ARCO tiles). Point series read ARCO geo-chunked stores directly | `climate_mirror/era5land` |
 | MERRA-2, IMERG | Read directly from NASA POWER; we keep only common-grid copies | `climate_mirror/web` |
