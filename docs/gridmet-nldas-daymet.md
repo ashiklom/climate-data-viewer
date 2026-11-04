@@ -52,6 +52,7 @@ Icechunk as for PRISM and CHIRPS. Sources were tested on 2026-11-04: anonymous H
   - **Variables:** all ten canonical variables.
 - **Download handling:** each day's files are downloaded, written, checked against the files, then deleted.
 - **OPeNDAP glitch:** OPeNDAP returned a different hour's granule for the first requests of a new login session. Every granule's `time` is now checked, and the session logs in before parallel requests.
+  The affected days were re-mirrored; `just gc nldas` then deleted the 2.1 GB of replaced chunks left in the history.
 - **Check:** `scripts/nldas/verify.py` matches NASA Giovanni at three points for all of 2021. That covers hourly Tair, Rainf and SoilM, and daily tas/tasmax/tasmin/pr/sm1 recomputed from Giovanni.
 
 ### Daymet V4 R1 (1 km, North America, 1980–)

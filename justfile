@@ -144,3 +144,8 @@ benchmark-browser:
 # Lint Python
 lint:
     uv run ruff check src scripts
+
+# Drop a mirror's history before the main tip and delete chunks only that history used (e.g. `just gc nldas`;
+# add --dry-run to only report). The current data is unchanged.
+gc *mirrors:
+    {{py}} scripts/gc_store.py {{mirrors}}
