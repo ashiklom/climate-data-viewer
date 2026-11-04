@@ -135,26 +135,57 @@ export async function pointSeries(dataset: DatasetName, variable: string, lon: n
   return { dataset, dates, values, source };
 }
 
-/** Area-weighted mean over a lon/lat box on the common grid for one day. */
-export async function boxMean(dataset: DatasetName, variable: string, date: string, box: [number, number, number, number]): Promise<number> {
+type Box = [number, number, number, number];
+
+/** One day of a lon/lat box on the common grid, keyed by global common-grid cell (row * nx + col). */
+async function boxCells(dataset: DatasetName, variable: string, date: string, box: Box): Promise<Map<number, { v: number; w: number }>> {
   const spec = sources.datasets[dataset].common;
+  const grid = sources.common_grid;
   const g = await openIcechunkGroup(spec.url, spec.group);
   const ax = await timeAxis(g);
   const [lats, lons] = await Promise.all([coord(g, "lat", `${spec.url}c`), coord(g, "lon", `${spec.url}c`)]);
   const [w, s, e, n] = box;
   const ys = [...lats.keys()].filter((i) => lats[i]! >= s && lats[i]! <= n);
   const xs = [...lons.keys()].filter((i) => lons[i]! >= w && lons[i]! <= e);
-  if (!ys.length || !xs.length) return NaN;
+  const cells = new Map<number, { v: number; w: number }>();
+  if (!ys.length || !xs.length) return cells;
   const arr = await zarr.open(g.resolve(variable), { kind: "array" });
   const chunk = await zarr.get(arr, [indexOf(ax, date), zarr.slice(ys[0]!, ys.at(-1)! + 1), zarr.slice(xs[0]!, xs.at(-1)! + 1)]);
   const data = chunk.data as Float32Array;
-  let sum = 0, wsum = 0;
   ys.forEach((yi, r) => {
+    const row = Math.round((grid.north - lats[yi]!) / grid.res);
     const wt = Math.cos((lats[yi]! * Math.PI) / 180);
-    for (let c = 0; c < xs.length; c++) {
+    xs.forEach((xi, c) => {
       const v = data[r * xs.length + c]!;
-      if (Number.isFinite(v)) { sum += v * wt; wsum += wt; }
-    }
+      if (Number.isFinite(v)) cells.set(row * grid.nx + Math.round((lons[xi]! - grid.west) / grid.res), { v, w: wt });
+    });
   });
-  return wsum ? sum / wsum : NaN;
+  return cells;
+}
+
+export interface BoxMean {
+  dataset: DatasetName;
+  shared: number; // mean over the cells every dataset with data in the box covers
+  own: number; // mean over all of this dataset's own cells in the box
+  ownCells: number;
+}
+
+/** cos(lat)-weighted means over a lon/lat box on the common grid for one day. `shared` uses only the cells that
+ * every dataset with data in the box covers, so land-only and global datasets are compared like for like. */
+export async function boxMeans(datasets: DatasetName[], variable: string, date: string, box: Box):
+    Promise<{ means: BoxMean[]; sharedCells: number }> {
+  const results = await Promise.allSettled(datasets.map((d) => boxCells(d, variable, date, box)));
+  const fields = results.map((r) => (r.status === "fulfilled" ? r.value : new Map<number, { v: number; w: number }>()));
+  const present = fields.filter((f) => f.size);
+  const shared = present.length ? [...present[0]!.keys()].filter((k) => present.every((f) => f.has(k))) : [];
+  const mean = (f: Map<number, { v: number; w: number }>, keys: Iterable<number>) => {
+    let sum = 0, wsum = 0;
+    for (const k of keys) { const c = f.get(k)!; sum += c.v * c.w; wsum += c.w; }
+    return wsum ? sum / wsum : NaN;
+  };
+  const means = datasets.map((dataset, i) => {
+    const f = fields[i]!;
+    return { dataset, shared: f.size ? mean(f, shared) : NaN, own: mean(f, f.keys()), ownCells: f.size };
+  });
+  return { means, sharedCells: shared.length };
 }

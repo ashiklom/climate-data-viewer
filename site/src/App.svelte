@@ -10,7 +10,7 @@
 
   import { registerCodecs, sources, type DatasetName } from "./lib/data";
   import { commonSource, makeLayer, nativeSource, type Style } from "./lib/layers";
-  import { boxMean, pointSeries, type Series } from "./lib/series";
+  import { boxMeans as computeBoxMeans, pointSeries, type BoxMean, type Series } from "./lib/series";
   import { DISPLAY, RATIO_RANGE } from "./lib/vars";
 
   registerCodecs();
@@ -31,7 +31,8 @@
   let point = $state<{ lon: number; lat: number } | null>(null);
   let series = $state<Series[]>([]);
   let seriesStatus = $state("");
-  let boxMeans = $state<{ dataset: DatasetName; value: number }[]>([]);
+  let boxMeans = $state<BoxMean[]>([]);
+  let sharedCells = $state(0);
 
   let mapEl: HTMLDivElement;
   let chartEl: HTMLDivElement;
@@ -129,11 +130,12 @@
     }));
   }
 
+  const fmt = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : "—");
+
   async function meansOverView() {
     const b = map.getBounds();
     const box: [number, number, number, number] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
-    const results = await Promise.allSettled(available.map((d) => boxMean(d, variable, date, box)));
-    boxMeans = results.map((r, i) => ({ dataset: available[i]!, value: r.status === "fulfilled" ? r.value : NaN }));
+    ({ means: boxMeans, sharedCells } = await computeBoxMeans(available, variable, date, box));
   }
 
   onMount(() => {
@@ -210,10 +212,15 @@
 
     <button onclick={meansOverView}>Area means over current view</button>
     {#if boxMeans.length}
-      <table><tbody>
-        {#each boxMeans as m}<tr><td>{sources.datasets[m.dataset].label}</td><td>{Number.isFinite(m.value) ? m.value.toFixed(2) : "—"}</td></tr>{/each}
-      </tbody></table>
-      <p class="note">Common grid, cos(lat)-weighted, {date}, {canonical.units}</p>
+      <table>
+        <thead><tr><th></th><th>shared cells</th><th>own cells</th></tr></thead>
+        <tbody>
+          {#each boxMeans as m}<tr><td>{sources.datasets[m.dataset].label}</td><td>{fmt(m.shared)}</td><td class="own">{fmt(m.own)} <small>({m.ownCells})</small></td></tr>{/each}
+        </tbody>
+      </table>
+      <p class="note">Common 0.25° grid, cos(lat)-weighted, {date}, {canonical.units}. "Shared cells": only the
+        {sharedCells} cells every listed dataset covers (compare these). "Own cells": each dataset's full coverage
+        in the view, which mixes land-only and global grids.</p>
     {/if}
 
     <details>
@@ -261,5 +268,7 @@
   .status { font-size: 12px; color: #666; margin: 0; }
   table { font-size: 12px; border-collapse: collapse; }
   td { padding: 1px 6px; border-bottom: 1px solid #eee; }
+  th { padding: 1px 6px; font-weight: 500; color: #666; text-align: left; }
+  td.own { color: #888; white-space: nowrap; }
   details { font-size: 12px; }
 </style>
