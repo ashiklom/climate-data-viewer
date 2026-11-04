@@ -11,8 +11,6 @@ repo/store (no in-process cache); local stores still benefit from the OS page ca
 from __future__ import annotations
 
 import argparse
-import asyncio
-import itertools
 import statistics
 import time
 from collections.abc import Callable
@@ -22,12 +20,11 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import zarr
-from zarr.abc.store import SuffixByteRequest
-from zarr.core.buffer import default_buffer_prototype
 from zarr.core.sync import sync
 from zarr.storage import FsspecStore
 
 from climate_mirror import credentials, era5land, storage
+from climate_mirror.chunkstats import fetched_bytes
 from climate_mirror.paths import RESULTS_DIR
 
 POINT = (41.31, -72.93)  # New Haven
@@ -89,48 +86,11 @@ SOURCES = [
 
 
 def coords(store, group):
-    ds = xr.open_zarr(store, group=group, consolidated=False if group or not isinstance(store, FsspecStore) else True,
+    ds = xr.open_zarr(store, group=group, consolidated=not group and isinstance(store, FsspecStore),
                       chunks=None, decode_times=True)
     names = {d: next(n for n in (d, {"lat": "latitude", "lon": "longitude", "time": "valid_time"}[d]) if n in ds.coords)
              for d in ("time", "lat", "lon")}
     return ds[names["time"]].values, ds[names["lat"]].values, ds[names["lon"]].values
-
-
-async def fetched_bytes(arr: zarr.Array, sel: tuple) -> tuple[int, int]:
-    """Chunks a selection touches and their stored (compressed) size; absent chunks count as touched, 0 bytes.
-    For sharded arrays, inner chunks are counted from each shard's index (plus the index read itself)."""
-    a = arr._async_array
-    outer = arr.shards or arr.chunks
-    per = [o // c for o, c in zip(outer, arr.chunks)]
-    n_inner = int(np.prod(per))
-
-    def chunk_range(s, c, n):
-        start, stop, _ = s.indices(n) if isinstance(s, slice) else (s, s + 1, 1)
-        return range(start // c, (stop - 1) // c + 1)
-
-    inner = list(itertools.product(*(chunk_range(s, c, n) for s, c, n in zip(sel, arr.chunks, arr.shape))))
-    by_shard: dict[tuple, list[tuple]] = {}
-    for idx in inner:
-        by_shard.setdefault(tuple(i // p for i, p in zip(idx, per)), []).append(idx)
-    prefix = f"{a.path}/" if a.path else ""
-    sem = asyncio.Semaphore(64)
-
-    async def size(shard, members):
-        key = prefix + a.metadata.encode_chunk_key(shard)
-        async with sem:
-            if not arr.shards:
-                buf = await a.store_path.store.get(key, default_buffer_prototype())
-                return 0 if buf is None else len(buf)
-            index_bytes = n_inner * 16 + 4  # (offset, nbytes) uint64 pairs + crc32c, at the shard's end
-            buf = await a.store_path.store.get(key, default_buffer_prototype(), SuffixByteRequest(index_bytes))
-            if buf is None:
-                return 0
-            ent = np.frombuffer(buf.to_bytes()[: n_inner * 16], dtype="<u8").reshape(-1, 2)
-            flat = [np.ravel_multi_index(tuple(i % p for i, p in zip(m, per)), per) for m in members]
-            return index_bytes + int(sum(ent[f, 1] for f in flat if ent[f, 0] != 2**64 - 1))
-
-    sizes = await asyncio.gather(*(size(sh, m) for sh, m in by_shard.items()))
-    return len(inner), sum(sizes)
 
 
 def timed(fn) -> float:
@@ -166,7 +126,7 @@ def bench(src: Source) -> list[dict]:
             store, group = src.opener()
             arr = zarr.open_array(store, path=f"{group}/{src.var}" if group else src.var, mode="r")
             opens.append(time.perf_counter() - t0)
-            times.append(timed(lambda: np.asarray(arr[sel])))
+            times.append(timed(lambda a=arr, s=sel: np.asarray(a[s])))
         n_chunks, nbytes = sync(fetched_bytes(arr, sel))  # zarr's event loop, which owns HTTP sessions
         values = int(np.prod([len(range(*s.indices(d))) if isinstance(s, slice) else 1 for s, d in zip(sel, arr.shape)]))
         rows.append({
@@ -191,7 +151,7 @@ def main() -> None:
             continue
         try:
             rows += bench(src)
-        except Exception as e:  # keep going; report the failure
+        except Exception as e:  # noqa: BLE001 - keep going; report the failure
             print(f"FAILED {src.name}: {e!r}", flush=True)
     df = pd.DataFrame(rows)
     out = RESULTS_DIR / "read_benchmark.csv"
