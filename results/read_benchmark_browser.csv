@@ -1,0 +1,7 @@
+dataset,map_s,map_mb,map_requests,series_s,series_mb,series_requests,series_source
+prism,2.89,226,233,0.0811,5.91,21,PRISM mirror (32-day chunks)
+chirps,0.0955,2.43,7,2.41,1.93,13,dynamical.org CHIRPS v3 (time-optimized)
+era5,0.177,1.44,2,1.39,2.23,11,Earthmover ERA5 single/temporal (hourly → UTC days)
+era5land,0.163,3.34,7,2.42,1.33,5,ECMWF ARCO ERA5-Land geo-chunked (hourly → UTC days)
+merra2,1.24,0.271,5,1.5,1.36,5,NASA POWER temporal store
+imerg,1.59,1.16,5,2.41,6.91,5,NASA POWER temporal store

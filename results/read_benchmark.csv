@@ -1,0 +1,27 @@
+source,location,task,var,array_chunks,values,chunks_read,mb_fetched,mb_decoded,open_s,read_s_median,read_s_min,repeats
+PRISM daily (our mirror),local,map (one time step),ppt,32x256x256,21812625,364,225.7,3053,0.007582,0.329,0.3012,3
+PRISM daily (our mirror),local,series 2021,ppt,32x256x256,365,12,5.765,100.7,0.007553,0.01527,0.01507,3
+PRISM daily (our mirror),local,series full record,ppt,32x256x256,16741,524,6.786,4396,0.007605,0.03364,0.03353,3
+CHIRPS pentads (our native mirror),local,map (one time step),precip,18x400x400,17280000,108,156.1,1244,0.0009562,0.2219,0.1946,3
+CHIRPS pentads (our native mirror),local,series 2021,precip,18x400x400,72,4,15.93,46.08,0.004478,0.02521,0.025,3
+CHIRPS pentads (our native mirror),local,series full record,precip,18x400x400,3294,183,37.2,2108,0.004479,0.05693,0.05479,3
+CHIRPS daily (our map copy of dynamical),local,map (one time step),pr,1x1200x1800,17280000,8,9,69.12,0.001005,0.01636,0.01577,3
+"CHIRPS daily (dynamical, Earthmover)",remote,series 2021,precipitation_surface,365x60x60,365,2,1.902,10.51,0.5825,1.362,1.077,3
+"CHIRPS daily (dynamical, Earthmover)",remote,series full record,precipitation_surface,365x60x60,16709,46,41.83,241.8,0.5512,5.613,5.613,1
+ERA5 daily (our derived mirror),local,map (one time step),pr,1x721x1440,1038240,1,1.365,4.153,0.005789,0.004588,0.00436,3
+ERA5 hourly spatial (Earthmover),remote,map (one time step),tp,1x721x1440,1038240,1,0.8014,4.153,0.5169,1.021,0.6184,3
+ERA5 hourly temporal (Earthmover),remote,series 2021,tp,8736x12x12,8760,2,1.578,10.06,0.5774,0.9928,0.9859,3
+ERA5 hourly temporal (Earthmover),remote,series full record,tp,8736x12x12,758232,87,71.12,437.8,0.4604,6.258,6.258,1
+ERA5-Land daily (our derived mirror),local,map (one time step),pr,1x901x1800,6483600,4,4.645,25.95,0.004011,0.01053,0.01009,3
+ERA5-Land hourly timeChunked (ARCO),remote,map (one time step),tp,1x1024x1024,6483600,8,2.591,33.55,0.1823,1.42,0.9572,3
+ERA5-Land hourly geoChunked (ARCO),remote,series 2021,tp,33792x4x8,8760,1,1.31,4.325,0.1729,1.734,0.9048,3
+ERA5-Land hourly geoChunked (ARCO),remote,series full record,tp,33792x4x8,673416,20,27.09,86.51,0.176,7.146,7.146,1
+MERRA-2 daily spatial (POWER),remote,map (one time step),PRECTOTCORR,1x361x576,207936,1,0.2081,0.8317,0.1256,0.1429,0.1357,3
+MERRA-2 daily temporal (POWER),remote,series 2021,PRECTOTCORR,5844x15x15,365,1,1.299,5.26,0.1232,0.4674,0.431,3
+MERRA-2 daily temporal (POWER),remote,series full record,PRECTOTCORR,5844x15x15,17898,4,4.347,21.04,0.1218,2.449,2.449,1
+IMERG daily spatial (POWER),remote,map (one time step),IMERG_PRECTOT,1x900x1800,6480000,4,4.442,25.92,0.1197,1.337,1.325,3
+IMERG daily temporal (POWER),remote,series 2021,IMERG_PRECTOT,1461x50x100,365,1,6.895,29.22,0.1209,2.714,2.628,3
+IMERG daily temporal (POWER),remote,series full record,IMERG_PRECTOT,1461x50x100,11688,8,49.83,233.8,0.3677,8.372,8.372,1
+Common 0.25 deg daily (our mirrors),local,map (one time step),pr,1x721x1440,1038240,1,2.048,4.153,0.000711,0.005524,0.005326,3
+Common 0.25 deg daily (our mirrors),local,series 2021,pr,1x721x1440,365,365,729.9,1516,0.0009347,0.8287,0.7905,3
+Common 0.25 deg daily (our mirrors),local,series full record,pr,1x721x1440,31777,31777,729.9,1.32e+05,0.001095,2.368,2.273,3
