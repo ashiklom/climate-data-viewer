@@ -39,6 +39,15 @@ target = "local"
 [mirrors.imerg]
 target = "local"
 
+[mirrors.gridmet]
+target = "local"
+
+[mirrors.nldas]
+target = "local"
+
+[mirrors.daymet]
+target = "local"
+
 [external.era5_earthmover]
 # Earthmover "ERA5" exchange listing 6a19bcfe9aa6e97720a2fad2 (earthmover-public, CC-BY-4.0).
 kind = "icechunk"

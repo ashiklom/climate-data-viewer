@@ -55,11 +55,13 @@ class Grid:
 def init_daily_group(
     repo: icechunk.Repository, path: str, grid: Grid, start: dt.date, end: dt.date, variables: list[str],
     attrs: dict, codec: str = "pcodec8", var_attrs: dict[str, dict] | None = None,
-    chunks: tuple[int, int, int] | None = None,
+    chunks: tuple[int, int, int] | None = None, shards: tuple[int, int, int] | None = None,
 ) -> None:
     """Create `path` with a daily time axis [start, end], coordinates, and empty arrays (if missing).
 
-    `chunks` defaults to one whole map per day; large grids should use spatial tiles (e.g. (1, 1200, 1800))."""
+    `chunks` defaults to one whole map per day; large grids should use spatial tiles (e.g. (1, 1200, 1800)).
+    With `shards`, chunks are inner chunks of those shards (e.g. one-day tiles in 32-day shards: maps read one
+    chunk per tile, point series one small chunk per day)."""
     session = repo.writable_session("main")
     try:
         zarr.open_group(session.store, path=path, mode="r")
@@ -86,7 +88,7 @@ def init_daily_group(
         group.create_array(
             name, shape=(len(dates), grid.ny, grid.nx), dtype="float32", chunks=chunks or (1, grid.ny, grid.nx),
             fill_value=np.nan, dimension_names=["time", "lat", "lon"], attributes=a,
-            config={"write_empty_chunks": False}, **codec_kwargs(codec, 4),
+            config={"write_empty_chunks": False}, **({"shards": shards} if shards else {}), **codec_kwargs(codec, 4),
         )
     session.commit(f"{path}: daily axis {start}..{end}, empty {', '.join(variables)}", rebase_with=icechunk.ConflictDetector())
 
