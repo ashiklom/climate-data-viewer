@@ -1,7 +1,8 @@
 """Open each dataset's daily data as canonical variables (see climate_mirror.variables).
 
 Every reader returns a lazy xr.Dataset with dims (time, lat, lon), daily `time` (period start, as
-labelled by the source), lat/lon cell centers in degrees, and canonical names and units. Day
+labelled by the source), lat/lon cell centers in degrees (Daymet: (time, y, x) on its projected grid, with
+`crs_wkt` in the attributes), and canonical names and units. Day
 definitions differ by source and are recorded in DAY_WINDOW (the website shows them).
 """
 
@@ -14,7 +15,7 @@ import xarray as xr
 
 from climate_mirror import storage
 
-DATASETS = ["prism", "chirps", "era5", "era5land", "merra2", "imerg", "gridmet", "nldas"]
+DATASETS = ["prism", "chirps", "era5", "era5land", "merra2", "imerg", "gridmet", "nldas", "daymet"]
 
 DAY_WINDOW = {
     "prism": "24 h ending 12:00 UTC on the labelled date",
@@ -25,6 +26,7 @@ DAY_WINDOW = {
     "imerg": "UTC day (NASA POWER, IMERG Final)",
     "gridmet": "calendar day ending at midnight MST (07 UTC the next day)",
     "nldas": "UTC day (00-24 UTC; precipitation is CPC daily gauge analysis, 12-12 UTC, split into hours)",
+    "daymet": "24-hour day based on local time (Daymet)",
 }
 
 PRISM_CROSSWALK = {"pr": "ppt", "tas": "tmean", "tasmax": "tmax", "tasmin": "tmin", "tdps": "tdmean", "rsds": "soltotal"}
@@ -91,7 +93,21 @@ def nldas(start: dt.date, end: dt.date) -> xr.Dataset:
     return _sel(_mirror_group("nldas", "daily").drop_vars("time_bnds"), start, end)
 
 
-READERS = {"prism": prism, "chirps": chirps, "era5": era5, "era5land": era5land, "merra2": merra2, "imerg": imerg, "gridmet": gridmet, "nldas": nldas}
+def daymet(start: dt.date, end: dt.date) -> xr.Dataset:
+    """Daymet mirror (scripts/daymet/mirror.py), CONUS window, canonical variables on the native LCC grid:
+    dims (time, y, x) in metres, with `crs_wkt` in the attributes (regrid_common reprojects it)."""
+    from climate_mirror import daymet as dm
+
+    repo = storage.open_mirror("daymet")
+    ds = xr.open_zarr(repo.readonly_session("main").store, group="daily", consolidated=False, chunks=None)
+    ds = _sel(ds, start, end).isel(y=slice(*dm.WINDOW_Y), x=slice(*dm.WINDOW_X))
+    native = {v: ds[v].astype(np.float32) for v in dm.VARIABLES}
+    out = xr.Dataset({c: dm.canonical(c, native).astype(np.float32) for c in dm.CANONICAL_VARS})
+    out.attrs["crs_wkt"] = dm.crs_wkt()
+    return out
+
+
+READERS = {"prism": prism, "chirps": chirps, "era5": era5, "era5land": era5land, "merra2": merra2, "imerg": imerg, "gridmet": gridmet, "nldas": nldas, "daymet": daymet}
 
 
 def open_daily(name: str, start: dt.date, end: dt.date) -> xr.Dataset:

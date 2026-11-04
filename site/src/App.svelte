@@ -269,7 +269,8 @@
         {#if canonical.comparable_note}<li>{canonical.comparable_note}</li>{/if}
         <li>CHIRPS daily values are CHIRPS pentad totals split into days with ERA5: daily CHIRPS vs ERA5/ERA5-Land comparisons are partly circular; compare over ≥5 days.</li>
         <li>CHIRPS (dynamical.org) values are bit-rounded to 8 mantissa bits (≤0.2% relative).</li>
-        <li>PRISM covers CONUS only; its day ends at 12 UTC.</li>
+        <li>PRISM covers CONUS only; its day ends at 12 UTC. gridMET, NLDAS-2 and the Daymet mirror also cover CONUS only.</li>
+        <li>Daymet mean temperature, shortwave energy and dew point are computed from tmax/tmin, daylight-mean radiation × day length, and vapour pressure; gridMET mean temperature is (tmax + tmin) / 2.</li>
         <li>A − B and A / B use conservative regridding to the ERA5 0.25° grid; cells more than half missing are blank.</li>
       </ul>
     </details>
@@ -286,7 +287,7 @@
       {#if series.length}
         <div class="chart">
           <SeriesChart {series} labels={LABELS} colors={seriesColors} units={canonical.units} {date}
-            yLabel={`${canonical.long_name} (${canonical.units})`} onpick={(d) => (date = d)} />
+            yLabel={canonical.units} onpick={(d) => (date = d)} />
         </div>
         <p class="hint">Scroll to zoom, drag to pan, slider to pick a window; hover for values; click a day to map it.</p>
       {/if}

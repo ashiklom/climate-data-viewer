@@ -84,6 +84,20 @@ await step("native-prism-tas", async () => {
   return `${await waitText(".status", /loaded in|error/)} s; ${await status()}`;
 });
 
+await step("native-daymet-tdps-derived", async () => {
+  await page.locator("select").first().selectOption("tdps");
+  await page.locator("select").nth(1).selectOption("daymet");
+  return `${await waitText(".status", /loaded in|error/)} s; ${await status()}`;
+});
+
+await step("diff-daymet-minus-gridmet-tas", async () => {
+  await page.locator("select").first().selectOption("tas");
+  await page.locator('input[value="diff"]').check();
+  await page.locator("select").nth(1).selectOption("daymet");
+  await page.locator("select").nth(2).selectOption("gridmet");
+  return `${await waitText(".status", /loaded in|error/)} s; ${await status()}`;
+});
+
 await step("area-means", async () => {
   await page.getByText("Area means over current view").click();
   await page.waitForSelector("aside table td", { timeout: 60000 });

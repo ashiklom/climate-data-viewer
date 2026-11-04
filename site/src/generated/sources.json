@@ -657,6 +657,70 @@
     "tasmin",
     "tdps"
    ]
+  },
+  "daymet": {
+   "label": "Daymet 1km (CONUS)",
+   "maps": {
+    "kind": "icechunk",
+    "url": "/data/daymet.icechunk",
+    "group": "daily",
+    "cf": true,
+    "variables": {
+     "pr": {
+      "name": "prcp"
+     },
+     "tasmax": {
+      "name": "tmax"
+     },
+     "tasmin": {
+      "name": "tmin"
+     },
+     "tas": {
+      "inputs": [
+       "tmax",
+       "tmin"
+      ],
+      "op": "mean"
+     },
+     "rsds": {
+      "inputs": [
+       "srad",
+       "dayl"
+      ],
+      "op": "daylight_energy"
+     },
+     "tdps": {
+      "inputs": [
+       "vp"
+      ],
+      "op": "dewpoint_tetens"
+     }
+    }
+   },
+   "series": "maps",
+   "series_note": "Daymet mirror (one-day 1 km tiles in 32-day shards)",
+   "day_window": "24-hour day based on local time (Daymet)",
+   "common": {
+    "kind": "icechunk",
+    "url": "/data/daymet.icechunk",
+    "group": "common_0p25/daily"
+   },
+   "variables": [
+    "pr",
+    "rsds",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
+   ],
+   "series_variables": [
+    "pr",
+    "rsds",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
+   ]
   }
  }
 }

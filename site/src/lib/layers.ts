@@ -12,13 +12,15 @@ import type { Texture } from "@luma.gl/core";
 import * as zarr from "zarrita";
 
 import { cfDecode, indexOf, openIcechunkGroup, openZarr2Group, sources, timeAxis, type DatasetName } from "./data";
+import { combine, inputsOf, type VarSpec } from "./derive";
 
 type Arr = zarr.Array<zarr.DataType, zarr.Readable>;
 type TileData = MinimalTileData & { texture: Texture };
 type Grp = zarr.Group<zarr.Readable>;
 
 export type Style = { clim: [number, number]; cmap: keyof typeof COLORMAP_INDEX; reversed?: boolean };
-export type MapSource = { group: Grp; arr: Arr; metadata: Record<string, unknown>; timeIndex: number };
+// `arr` is the first (or only) input; derived variables (`spec.op`) also read `more` on the same grid and chunks.
+export type MapSource = { group: Grp; arr: Arr; metadata: Record<string, unknown>; timeIndex: number; more?: Arr[]; spec?: VarSpec };
 
 const groupCache = new Map<string, Promise<Grp>>();
 function cachedGroup(key: string, open: () => Promise<Grp>) {
@@ -44,10 +46,11 @@ async function geozarrFromCoords(group: Grp): Promise<Record<string, unknown>> {
 /** The native daily map of `variable` (canonical name) for `dataset` on `date`. */
 export async function nativeSource(dataset: DatasetName, variable: string, date: string): Promise<MapSource> {
   const spec = sources.datasets[dataset].maps as {
-    kind: string; url: string; group?: string; variables: Record<string, { name: string }>; time?: string;
+    kind: string; url: string; group?: string; variables: Record<string, VarSpec>; time?: string;
   };
-  const name = spec.variables[variable]?.name;
-  if (!name) throw new Error(`${dataset} has no ${variable}`);
+  const vspec = spec.variables[variable];
+  if (!vspec) throw new Error(`${dataset} has no ${variable}`);
+  const [name, ...rest] = inputsOf(vspec);
   let group: Grp;
   let metadata: Record<string, unknown>;
   if (spec.kind === "icechunk") {
@@ -57,9 +60,9 @@ export async function nativeSource(dataset: DatasetName, variable: string, date:
     group = await cachedGroup(spec.url, () => openZarr2Group(spec.url));
     metadata = await geozarrFromCoords(group);
   }
-  const arr = (await zarr.open(group.resolve(name), { kind: "array" })) as Arr;
+  const [arr, ...more] = (await Promise.all([name!, ...rest].map((n) => zarr.open(group.resolve(n), { kind: "array" })))) as Arr[];
   const ax = await timeAxis(group, spec.time ?? "time");
-  return { group, arr, metadata, timeIndex: indexOf(ax, date) };
+  return { group, arr: arr!, metadata, timeIndex: indexOf(ax, date), more, spec: vspec };
 }
 
 /** The common-grid (0.25 deg) daily field of `variable` for `dataset`. */
@@ -106,7 +109,11 @@ export function makeLayer(
     metadata: a.metadata,
     selection: { time: a.timeIndex },
     getTileData: async (arr: Arr, o: GetTileDataOptions) => {
-      const ta = await readTile(arr, o);
+      let ta = await readTile(arr, o);
+      if (a.more?.length || a.spec?.op) {
+        const others = await Promise.all((a.more ?? []).map((m) => readTile(m, o)));
+        ta = { ...ta, data: combine(a.spec!, [ta.data, ...others.map((t) => t.data)]) };
+      }
       if (!b) return upload(o, ta.data, ta.w, ta.h);
       // Same grid and chunking (common grid): read the matching tile of B at B's own time index.
       const sliceB = o.sliceSpec.map((s, i) => (i === 0 ? b.timeIndex : s));

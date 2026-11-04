@@ -12,11 +12,16 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 
-from climate_mirror import chirps, era5, era5land, gridmet, nldas, storage
+from climate_mirror import chirps, daymet, era5, era5land, gridmet, nldas, storage
 from climate_mirror.paths import REPO_ROOT
 from climate_mirror.variables import CANONICAL
-from climate_mirror.web.daily_sources import DAY_WINDOW, MERRA2_CROSSWALK, PRISM_CROSSWALK
+from climate_mirror.web.daily_sources import (
+    DAY_WINDOW,
+    MERRA2_CROSSWALK,
+    PRISM_CROSSWALK,
+)
 
+DAYMET_OPS = {"tas": "mean", "rsds": "daylight_energy", "tdps": "dewpoint_tetens"}  # site/src/lib/derive.ts
 OUT = REPO_ROOT / "site" / "src" / "generated" / "sources.json"
 COMMON = "common_0p25/daily"
 
@@ -95,6 +100,16 @@ def main() -> None:
                      "variables": identity(nldas.CANONICAL_VARS)},
             "series": "maps",
             "series_note": "NLDAS-2 mirror, daily from hourly (one-day tiles in 32-day shards)",
+        },
+        "daymet": {
+            "label": "Daymet 1km (CONUS)",
+            "maps": {"kind": "icechunk", "url": mirror_url("daymet"), "group": "daily", "cf": True,
+                     # tas, rsds, tdps are computed from native arrays (climate_mirror.daymet.canonical; site derive.ts)
+                     "variables": {c: ({"name": ins[0]} if len(ins) == 1 and c not in DAYMET_OPS else
+                                       {"inputs": list(ins), "op": DAYMET_OPS[c]})
+                                   for c, ins in daymet.CANONICAL.items()}},
+            "series": "maps",
+            "series_note": "Daymet mirror (one-day 1 km tiles in 32-day shards)",
         },
     }
     datasets["prism"]["series_note"] = "PRISM mirror (one-day chunks in 32-day shards)"

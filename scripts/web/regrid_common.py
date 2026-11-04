@@ -26,9 +26,41 @@ from climate_mirror.web.daily_sources import DATASETS, DAY_WINDOW, open_daily
 GROUP = "common_0p25/daily"
 TARGET = xr.Dataset(coords={"lat": era5.GRID.lat, "lon": era5.GRID.lon})
 WINDOW_DAYS = 32  # = PRISM's daily time chunk, so PRISM windows align with its chunks when started on a boundary
+WINDOW_DAYS_BY_DATASET = {"daymet": 4}  # 1 km: 32 days of six variables would need tens of GB
+
+
+def reproject(ds: xr.Dataset) -> xr.Dataset:
+    """Projected grids (Daymet): area-average resampling (GDAL "average", weighted by source-pixel overlap) onto the
+    common grid. As for conservative regridding, cells less than half covered by valid source data are missing."""
+    from rasterio.transform import Affine
+    from rasterio.warp import Resampling
+    from rasterio.warp import reproject as warp
+
+    x, y = ds.x.values, ds.y.values
+    rx, ry = x[1] - x[0], y[1] - y[0]
+    src_transform = Affine(rx, 0, x[0] - rx / 2, 0, ry, y[0] - ry / 2)
+    g = era5.GRID
+    dst_transform = Affine(g.res, 0, g.west - g.res / 2, 0, -g.res, g.north + g.res / 2)
+    kw = {"src_transform": src_transform, "src_crs": ds.attrs["crs_wkt"], "dst_transform": dst_transform,
+          "dst_crs": "EPSG:4326", "resampling": Resampling.average, "num_threads": 8}
+    out = {}
+    for name, da in ds.data_vars.items():
+        days = []
+        for a in da.values:
+            valid = np.isfinite(a).astype(np.float32)
+            frac = np.zeros((g.ny, g.nx), np.float32)
+            warp(valid, frac, **kw)
+            dst = np.full((g.ny, g.nx), np.nan, np.float32)
+            warp(a.astype(np.float32), dst, src_nodata=np.nan, dst_nodata=np.nan, **kw)
+            dst[frac < 0.5] = np.nan
+            days.append(dst)
+        out[name] = (("time", "lat", "lon"), np.stack(days))
+    return xr.Dataset(out, coords={"time": ds.time.values, "lat": g.lat, "lon": g.lon})
 
 
 def regrid(ds: xr.Dataset) -> xr.Dataset:
+    if "x" in ds.dims:
+        return reproject(ds)
     ds = ds.sortby("lat", ascending=False).sortby("lon")
     out = ds.regrid.conservative(TARGET, latitude_coord="lat", skipna=True, nan_threshold=0.5)
     return out.astype(np.float32)
@@ -55,7 +87,7 @@ def main() -> None:
     p.add_argument("--end", type=dt.date.fromisoformat, required=True)
     args = p.parse_args()
 
-    probe = open_daily(args.dataset, args.start, args.start)
+    probe = open_daily(args.dataset, args.start, args.start).isel(time=slice(0, 0))
     variables = list(probe.data_vars)
     repo = storage.open_mirror(args.dataset, create=True)
     init_daily_group(
@@ -67,9 +99,10 @@ def main() -> None:
             "day_window": DAY_WINDOW[args.dataset],
         },
     )
-    for w0 in pd.date_range(args.start, args.end, freq=f"{WINDOW_DAYS}D"):
+    window = WINDOW_DAYS_BY_DATASET.get(args.dataset, WINDOW_DAYS)
+    for w0 in pd.date_range(args.start, args.end, freq=f"{window}D"):
         d0 = w0.date()
-        d1 = min(d0 + dt.timedelta(days=WINDOW_DAYS - 1), args.end)
+        d1 = min(d0 + dt.timedelta(days=window - 1), args.end)
         t0 = time.time()
         src = load_with_retry(args.dataset, d0, d1)
         out = regrid(src)

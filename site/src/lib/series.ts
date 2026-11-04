@@ -2,9 +2,11 @@
 //   PRISM, gridMET, NLDAS-2 (and other "series": "maps" datasets): our mirrors (one-day tiles in 32-day shards); CHIRPS: dynamical.org (365-day chunks); ERA5: Earthmover single/temporal
 //   (hourly, one ~year per chunk; aggregated to UTC days here with the same rules as climate_mirror.era5);
 //   MERRA-2 / IMERG: NASA POWER temporal stores; ERA5-Land: ECMWF ARCO geo-chunked stores (hourly, CDS key).
+import proj4 from "proj4";
 import * as zarr from "zarrita";
 
 import { cfDecode, indexOf, openIcechunkGroup, openZarr2Group, sources, timeAxis, type DatasetName } from "./data";
+import { combine, inputsOf, type VarSpec } from "./derive";
 
 type Grp = zarr.Group<zarr.Readable>;
 export type Series = { dataset: DatasetName; dates: string[]; values: number[]; source: string };
@@ -33,9 +35,17 @@ function days(start: string, end: string): string[] {
   return out;
 }
 
-/** Point series from a daily (time, lat, lon) array with 1-D lat/lon coordinates. */
+/** Point series from a daily (time, lat, lon) array with 1-D lat/lon coordinates, or (time, y, x) on a projected grid
+ * whose group has GeoZarr `proj:wkt2` (Daymet): the point is projected with proj4 first. */
 async function dailyPoint(group: Grp, key: string, varName: string, lon: number, lat: number, start: string, end: string,
   opts: { time?: string; latName?: string; lonName?: string; scale?: number } = {}): Promise<number[]> {
+  const attrs = group.attrs as Record<string, unknown>;
+  const wkt = attrs["proj:wkt2"] as string | undefined;
+  if (wkt) {
+    [lon, lat] = proj4("EPSG:4326", wkt, [lon, lat]);
+    const [yName, xName] = attrs["spatial:dimensions"] as [string, string];
+    opts = { ...opts, latName: yName, lonName: xName };
+  }
   const [lats, lons] = await Promise.all([coord(group, opts.latName ?? "lat", key), coord(group, opts.lonName ?? "lon", key)]);
   const ax = await timeAxis(group, opts.time ?? "time");
   const i0 = indexOf(ax, start), i1 = indexOf(ax, end) + 1;
@@ -127,9 +137,11 @@ export async function pointSeries(dataset: DatasetName, variable: string, lon: n
     values = await dailyPoint(g, s.url, s.variables[variable]!.name, lon, lat, start, end);
     source = "NASA POWER temporal store";
   } else {
-    const m = ds.maps as { url: string; group: string; variables: Record<string, { name: string }> };
+    const m = ds.maps as { url: string; group: string; variables: Record<string, VarSpec> };
     const g = await openIcechunkGroup(m.url, m.group);
-    values = await dailyPoint(g, `${m.url}|${m.group}`, m.variables[variable]!.name, lon, lat, start, end);
+    const spec = m.variables[variable]!;
+    const inputs = await Promise.all(inputsOf(spec).map((n) => dailyPoint(g, `${m.url}|${m.group}`, n, lon, lat, start, end)));
+    values = Array.from(combine(spec, inputs));
     source = (ds as { series_note?: string }).series_note ?? `${dataset} mirror`;
   }
   return { dataset, dates, values, source };

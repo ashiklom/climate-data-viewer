@@ -22,9 +22,27 @@ from climate_mirror.web.daily_sources import MERRA2_CROSSWALK, PRISM_CROSSWALK
 OUT = REPO_ROOT / "site" / "test-fixtures" / "parity.json"
 
 
-def mirror(name: str, group: str) -> xr.Dataset:
+def mirror(name: str, group: str, chunks: dict | None = {}) -> xr.Dataset:  # noqa: B006
     repo = storage.open_mirror(name)
-    return xr.open_zarr(repo.readonly_session("main").store, group=group, consolidated=False, chunks={})
+    return xr.open_zarr(repo.readonly_session("main").store, group=group, consolidated=False, chunks=chunks)
+
+
+class Derived:
+    """A Daymet canonical variable computed from native arrays (float64 arithmetic on float32 inputs, as the site)."""
+
+    def __init__(self, ds: xr.Dataset, name: str):
+        from climate_mirror import daymet
+
+        self.ds, self.name, self.inputs = ds, name, daymet.CANONICAL[name]
+        self.time = ds.time
+
+    def sel(self, time: str) -> xr.DataArray:
+        from climate_mirror import daymet
+
+        day = self.ds.sel(time=time).isel(y=slice(*daymet.WINDOW_Y), x=slice(*daymet.WINDOW_X))
+        a = {v: day[v].values.astype(np.float32).astype(np.float64) for v in self.inputs}
+        with np.errstate(invalid="ignore", divide="ignore"):
+            return xr.DataArray(daymet.canonical(self.name, a), dims=("y", "x"))
 
 
 def candidates() -> list[tuple[str, str, str, xr.DataArray]]:
@@ -38,7 +56,20 @@ def candidates() -> list[tuple[str, str, str, xr.DataArray]]:
         for v in ds.data_vars:
             if v != "time_bnds":
                 out.append((name, "native", v, ds[v]))
-    for name in ("prism", "era5", "era5land", "chirps", "merra2", "imerg"):
+    for name in ("gridmet", "nldas"):
+        ds = mirror(name, "daily", chunks=None)
+        for v in ds.data_vars:
+            if v != "time_bnds":
+                out.append((name, "native", v, ds[v]))
+    try:
+        dm = mirror("daymet", "daily", chunks=None)
+        from climate_mirror import daymet
+
+        for c in daymet.CANONICAL_VARS:
+            out.append(("daymet", "native", c, Derived(dm, c)))
+    except Exception:  # noqa: BLE001, S110 (not built yet)
+        pass
+    for name in ("prism", "era5", "era5land", "chirps", "merra2", "imerg", "gridmet", "nldas", "daymet"):
         try:
             ds = mirror(name, "common_0p25/daily")
         except Exception:
@@ -73,9 +104,14 @@ def main() -> None:
         if not len(finite):
             continue
         yi, xi = map(int, finite[rng.randrange(len(finite))])
+        value = float(np.float32(vals[yi, xi]))
+        if isinstance(da, Derived):  # indices within the CONUS window -> full grid
+            from climate_mirror import daymet
+
+            yi, xi = yi + daymet.WINDOW_Y[0], xi + daymet.WINDOW_X[0]
         cases.append({
             "dataset": ds, "kind": kind, "variable": var, "date": date, "yi": yi, "xi": xi,
-            "value": float(np.float32(vals[yi, xi])),
+            "value": value,
         })
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps(cases, indent=1))
