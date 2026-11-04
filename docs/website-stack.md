@@ -4,9 +4,17 @@
 
 - **Build and UI:** Vite 8 and Svelte 5 (TypeScript). The site is static; in development, the Vite dev server also
   serves the local Icechunk mirrors.
-- **Map:** MapLibre GL 5 (basemap) with deck.gl 9.4 through `@deck.gl/mapbox` `MapboxOverlay` (interleaved). Data
+- **Map:** MapLibre GL 5 with deck.gl 9.4 through `@deck.gl/mapbox` `MapboxOverlay` (interleaved). Data
   layers use `@developmentseed/deck.gl-zarr` 0.9 and deck.gl-raster GPU modules: `CreateTexture`,
   `FilterNoDataVal`, `LinearRescale` and `Colormap`.
+  - Basemap: OpenStreetMap raster tiles (`tile.openstreetmap.org`). That is fine for local use; a public site
+    should switch to a tile provider that allows it (OSM tile usage policy).
+  - The data layer sits below toggleable coastline, national-border and US-state lines (MapLibre line layers
+    from Natural Earth 1:10m, `scripts/web/make_overlays.py` → `site/public/overlays/`). Its opacity comes from
+    the transparency slider.
+- **Time series:** Apache ECharts 6 (tree-shaken: line chart, tooltip, data zoom, toolbox), in
+  `src/lib/SeriesChart.svelte`. Chosen over uPlot (no built-in pan) and Plotly (several MB) because zoom, pan,
+  range slider and a multi-series hover tooltip are built in.
 - **Data:**
   - `zarrita` 0.7.5 reads Zarr v2 and v3, including sharding.
   - `icechunk-js` 0.6.1 reads Icechunk v1 and v2 over HTTPS. It is pure TypeScript and needs no COOP/COEP headers.

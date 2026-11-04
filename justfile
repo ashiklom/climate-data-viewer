@@ -42,6 +42,10 @@ parity:
 e2e:
     cd site && node scripts/e2e.mjs
 
+# Regenerate the coastline / border overlays in site/public/overlays (Natural Earth 1:10m)
+overlays *args:
+    {{py}} scripts/web/make_overlays.py {{args}}
+
 # Build every data product the site reads, for a date range
 prototype-data start=start end=end:
     scripts/web/build_prototype_data.sh {{start}} {{end}}
