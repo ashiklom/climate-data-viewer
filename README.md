@@ -36,6 +36,9 @@ area means.
 
 ## Website (local prototype)
 
+`just setup` then `just serve` does the steps below; `just` lists the other common commands (downloads, builds,
+verification, tests, benchmarks). By hand:
+
 ```bash
 uv sync
 (cd packages/pco-wasm && npm install && npm run build)   # needs rustup, the wasm32 target, and wasm-pack

@@ -19,7 +19,8 @@ $PY scripts/chirps/rechunk_dynamical.py --start "$START" --end "$END"
 # ERA5: daily canonical variables from Earthmover's hourly ERA5.
 $PY scripts/era5/derive_daily.py --start "$START" --end "$END"
 
-# ERA5-Land: CDS daily statistics + 00 UTC accumulations, then daily canonical variables.
+# ERA5-Land: pr from ARCO hourly precipitation; the rest from CDS daily statistics + 00 UTC accumulations.
+$PY scripts/era5land/derive_pr_arco.py --start "$START" --end "$END"
 $PY scripts/era5land/fetch_cds.py --start "${START:0:7}" --end "${END:0:7}"
 $PY scripts/era5land/derive_daily.py --start "${START:0:7}" --end "${END:0:7}"
 
