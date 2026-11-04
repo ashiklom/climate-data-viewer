@@ -3,7 +3,6 @@
   import { createColormapTexture, decodeColormapSprite, COLORMAP_INDEX } from "@developmentseed/deck.gl-raster/gpu-modules";
   import colormapsPng from "@developmentseed/deck.gl-raster/gpu-modules/colormaps.png";
   import type { Device, Texture } from "@luma.gl/core";
-  import * as Plot from "@observablehq/plot";
   import maplibregl from "maplibre-gl";
   import "maplibre-gl/dist/maplibre-gl.css";
   import { onMount, untrack } from "svelte";
@@ -11,6 +10,7 @@
   import { registerCodecs, sources, type DatasetName } from "./lib/data";
   import { commonSource, makeLayer, nativeSource, type Style } from "./lib/layers";
   import { boxMeans as computeBoxMeans, pointSeries, type BoxMean, type Series } from "./lib/series";
+  import SeriesChart from "./lib/SeriesChart.svelte";
   import { DISPLAY, RATIO_RANGE } from "./lib/vars";
 
   registerCodecs();
@@ -36,7 +36,7 @@
     { id: "countries", label: "National borders", color: "#111", width: 1.1 },
     { id: "states", label: "US state borders", color: "#444", width: 0.7 },
   ] as const;
-  const COLORS = ["#4269d0", "#efb118", "#ff725c", "#6cc5b0", "#3ca951", "#a463f2"];
+  const COLORS = ["#4269d0", "#efb118", "#ff725c", "#6cc5b0", "#3ca951", "#a463f2", "#9c6b4e", "#97bbf5", "#ff8ab7"];
 
   type Mode = "native" | "diff" | "ratio";
   let variable = $state("pr");
@@ -54,7 +54,6 @@
   let overlaysOn = $state<Record<string, boolean>>({ coastline: true, countries: true, states: true });
 
   let mapEl: HTMLDivElement;
-  let chartEl: HTMLDivElement;
   let legendEl: HTMLCanvasElement;
   let map: maplibregl.Map;
   let overlay: MapboxOverlay;
@@ -134,26 +133,12 @@
     series = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
     const failed = results.flatMap((r, i) => (r.status === "rejected" ? [`${withSeries[i]}: ${r.reason}`] : []));
     seriesStatus = `${series.length} series in ${((performance.now() - t0) / 1000).toFixed(1)} s` + (failed.length ? ` — failed: ${failed.join("; ")}` : "");
-    drawChart();
   }
 
-  function drawChart() {
-    if (!chartEl) return;
-    chartEl.replaceChildren();
-    if (!series.length) return;
-    const rows = series.flatMap((s) => s.dates.map((d, i) => ({ dataset: s.dataset, date: new Date(d), value: s.values[i] }))
-      .filter((r) => Number.isFinite(r.value)));
-    chartEl.append(Plot.plot({
-      width: chartEl.clientWidth || 800, height: 240, marginLeft: 50,
-      y: { label: `${canonical.long_name} (${canonical.units})`, grid: true },
-      x: { label: null },
-      color: { legend: true, domain: series.map((s) => s.dataset), range: COLORS },
-      marks: [
-        Plot.lineY(rows, { x: "date", y: "value", stroke: "dataset", strokeWidth: 1.2 }),
-        Plot.ruleX([new Date(date)], { stroke: "#888", strokeDasharray: "3,3" }),
-      ],
-    }));
-  }
+  // short chart names: the label up to its resolution ("ERA5-Land 0.1°" -> "ERA5-Land")
+  const LABELS = Object.fromEntries(DATASETS.map((d) => [d, sources.datasets[d].label.split(" ")[0]!]));
+  // stable color per dataset, whichever subset has the variable
+  const seriesColors = $derived(series.map((s) => COLORS[DATASETS.indexOf(s.dataset) % COLORS.length]!));
 
   function addOverlays() {
     for (const o of OVERLAYS) {
@@ -298,7 +283,13 @@
       {:else}
         <h2>Click the map for daily time series of every dataset</h2>
       {/if}
-      <div bind:this={chartEl}></div>
+      {#if series.length}
+        <div class="chart">
+          <SeriesChart {series} labels={LABELS} colors={seriesColors} units={canonical.units} {date}
+            yLabel={`${canonical.long_name} (${canonical.units})`} onpick={(d) => (date = d)} />
+        </div>
+        <p class="hint">Scroll to zoom, drag to pan, slider to pick a window; hover for values; click a day to map it.</p>
+      {/if}
     </section>
   </main>
 </div>
@@ -314,7 +305,9 @@
   .disabled { color: #aaa; }
   main { display: grid; grid-template-rows: 1fr 300px; min-width: 0; }
   .map { min-height: 0; }
-  .series { padding: 8px 12px; border-top: 1px solid #ddd; overflow: hidden; }
+  .series { padding: 8px 12px; border-top: 1px solid #ddd; overflow: hidden; display: flex; flex-direction: column; }
+  .chart { flex: 1; min-height: 0; }
+  .hint { color: #888; font-size: 11px; margin: 0; }
   .series h2 { font-size: 14px; margin: 0 0 4px; }
   .series small { color: #666; font-weight: normal; }
   .legend canvas { width: 100%; height: 12px; display: block; }
