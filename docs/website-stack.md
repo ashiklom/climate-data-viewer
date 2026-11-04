@@ -43,5 +43,6 @@ The capture uses headless Chrome via `site/scripts/snapshot.mjs`; the desktop pr
   GeoZarr attributes as `metadata`.
 - Global grids whose edge rows extend past ±90° make the reprojection mesh warn (it does not converge). The map
   still renders correctly in Web Mercator.
-- A full PRISM daily map took about 2.6 s locally. Each 256×256 tile decodes its whole 32-day chunk on the main
-  thread. A worker plus a chunk cache would help.
+- A full PRISM daily map took about 2.6 s locally while each 256×256 tile decoded a whole 32-day chunk. PRISM daily
+  now stores one-day chunks inside 32-day shards: a CONUS map is about 1.2 s and 7 MB (see reports/prism.md).
+  Decoding still runs on the main thread; a worker would help.

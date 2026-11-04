@@ -25,7 +25,8 @@
   - Daily: 3 whole time chunks of 32 days each, starting 1985-01-12, 2003-07-09 and 2021-09-28.
   - Monthly: 3 whole years, 1900, 1960 and 2020.
   - All 9 variables (ppt, tmin, tmax, tmean, tdmean, vpdmin, vpdmax, soltotal, solslope), over the full 7025 × 3105 grid. That is 1,188 grid packages and 50 GB of zips.
-- **Chunks:** daily `(32, 256, 256)`, monthly `(12, 256, 256)` (one calendar year), both 8 MiB / 3 MiB raw.
+- **Chunks:** daily `(32, 256, 256)` at first (see the map-friendly daily layout below for the current one), monthly
+  `(12, 256, 256)` (one calendar year), 8 MiB / 3 MiB raw.
   - These balance full-map reads (∝ N_space · t) against full-record pixel series (∝ N_time · s²).
   - One daily map touches 364 chunks; a 46-year pixel series touches 524.
   - On the local store, a full daily map reads in 0.6 s and a 96-step pixel series in 0.01 s.
@@ -41,6 +42,39 @@
   | 8×512×512 / 32×512×512 | 7.03 | 1.5 / 6.1 | | 6×512×512 | 6.59 | 1.22 |
 
   Smaller spatial tiles skip more coastline-empty area. **For the full mirror, the sharded layout is the better choice:** about 6% smaller, the same object count and map cost, and point-series reads drop to 64×64 inner chunks, 16× less data per point. One caveat: zarr v3 readers without sharding support can't read it. zarrita, zarr-python and icechunk-js all support it.
+
+### Map-friendly daily layout (current, 2026-11-04)
+
+The comparison website showed the cost of 32-day chunks: one daily map of CONUS fetched 226 MB (364 chunks of 32
+days) and took 2.9 s in the browser even from local disk. The daily group now uses **32 × 512 × 512 shards of one-day
+256 × 256 chunks** (`catalog.DAILY`; existing data rewritten in place by `scripts/prism/relayout_daily.py`). The
+monthly group is unchanged.
+
+Layout test on two 32-day blocks of 2021 (`scripts/prism/map_layouts.py`, `results/prism/map_layouts.csv`), per day,
+`ppt` / `tmean`:
+
+| Layout | Storage vs 32×256×256 | CONUS map | Point series, one year | Point series, full record |
+|---|---|---|---|---|
+| 32×256×256 (before) | 1 | 193 / 361 MB, 364 objects | 6 / 10 MB, 11 objects | 276 / 473 MB, 523 objects |
+| 8×256×256 | 1.00 / 1.00 | 51 / 75 MB | 6 / 10 MB, 46 | 276 / 473 MB, 2,093 |
+| 1×256×256 | 0.90 / 0.98 | 7.0 / 9.3 MB | 5 / 10 MB, 365 | 248 / 466 MB, 16,741 |
+| 1×512×512 | 0.99 / 1.05 | 7.6 / 10 MB, 98 objects | 8 / 16 MB, 365 | 364 / 733 MB, 16,741 |
+| **shards 32×512×512 of 1×256×256 (chosen)** | **0.90 / 0.985** | **7.1 / 9.5 MB** | 5 / 10 MB, 365 ranges | 249 / 467 MB, 16,741 ranges |
+| 32×256×256 + 4×/16× overviews (1-day chunks) | 1.11 / 1.13 | 0.8 / 1.3 MB (4× level) | as before | as before |
+
+- One-day chunks compress as well as or better than 32-day ones under pcodec, so the full-mirror daily estimate
+  above (1.79 TB) is an upper bound: by this test the new layout needs about 2–10% less.
+- A map now reads 1/32 of the data. A point series reads the same bytes in more requests (one byte range per day,
+  from 32-day shard objects, so the object count is unchanged).
+- Overviews alone don't fix mid-zoom maps: a view of a few states still reads native 32-day tiles. They could be added
+  on top of this layout later to cut wide-view requests (28 instead of 364) for remote hosting.
+- Measured on the local store (`results/read_benchmark*.csv`): a CONUS map in Python 0.33 s → 0.06 s; in the site
+  2.9 s → 1.2 s and 226 MB → 6.9 MB. Point series: full record 0.03 s → 0.11 s in Python; one year in the site
+  0.08 s → 0.13 s (386 range requests instead of 21).
+- **xarray:** `xr.open_zarr(..., chunks={})` would make one dask chunk per one-day inner chunk (about 6 million per
+  variable) and is slow. `climate_mirror.prism.store.open_prism()` uses one dask chunk per shard and a lazy float32
+  cast, so maps and point series read only the chunks they need (map 0.07 s, full-record series 0.3 s). Plain
+  `xr.open_zarr(..., chunks=None)` is also fast.
 
 ## Codecs (all lossless at the integer level; see harmonization below)
 

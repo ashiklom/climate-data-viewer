@@ -65,7 +65,10 @@ VARIABLES: dict[str, Variable] = {
 }
 
 
-DAILY = Frequency("daily", DAILY_START, time_chunk=32, space_chunk=256)
+# Daily: 32-day x 512 x 512 shards of one-day 256 x 256 chunks. A one-day map reads 1/32 of what 32x256x256 chunks
+# cost, with the same object count and no more storage (one-day chunks compress as well or better); a point series
+# reads the same bytes in more (range) requests. See results/prism/map_layouts.csv.
+DAILY = Frequency("daily", DAILY_START, time_chunk=32, space_chunk=512, inner_chunk=(1, 256, 256))
 MONTHLY = Frequency("monthly", MONTHLY_START, time_chunk=12, space_chunk=256)
 FREQUENCIES = {"daily": DAILY, "monthly": MONTHLY}
 

@@ -173,7 +173,7 @@ def init_group(repo: icechunk.Repository, freq: Frequency, codec: str) -> None:
             var,
             shape=(len(dates), NY, NX),
             dtype=dtype,
-            chunks=(freq.time_chunk, freq.space_chunk, freq.space_chunk),
+            **freq.zarr_layout(),
             fill_value=fill,
             dimension_names=["time", "lat", "lon"],
             attributes=attrs,

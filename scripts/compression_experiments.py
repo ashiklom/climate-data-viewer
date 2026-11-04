@@ -94,8 +94,8 @@ def main() -> None:
         if args.layouts:
             runs = [(c, name, ch, sh) for c in args.codecs for name, (ch, sh) in ds.layouts[fname].items()]
         else:
-            chunks = (freq.time_chunk, freq.space_chunk, freq.space_chunk)
-            runs = [(c, default_layout, chunks, None) for c in args.codecs]
+            layout = freq.zarr_layout()
+            runs = [(c, default_layout, layout["chunks"], layout.get("shards")) for c in args.codecs]
         for var in args.vars or list(ds.variables):
             for ci in blocks:
                 todo = [r for r in runs if (fname, var, str(ci), r[0], r[1]) not in done]

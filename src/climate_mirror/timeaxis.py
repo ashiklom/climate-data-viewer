@@ -21,6 +21,17 @@ class Frequency:
     start: dt.date
     time_chunk: int
     space_chunk: int
+    # When set, each (time_chunk, space_chunk, space_chunk) block is a shard of these smaller chunks.
+    inner_chunk: tuple[int, int, int] | None = None
+
+    def zarr_layout(self) -> dict:
+        """`chunks` (and `shards`) arguments for zarr.create_array."""
+        block = (self.time_chunk, self.space_chunk, self.space_chunk)
+        return {"chunks": self.inner_chunk, "shards": block} if self.inner_chunk else {"chunks": block}
+
+    def layout_name(self) -> str:
+        block = f"{self.time_chunk}x{self.space_chunk}x{self.space_chunk}"
+        return f"shard{block}/{'x'.join(map(str, self.inner_chunk))}" if self.inner_chunk else block
 
     @cached_property
     def _axis(self) -> pd.DatetimeIndex:

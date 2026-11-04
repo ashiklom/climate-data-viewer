@@ -130,7 +130,7 @@ export async function pointSeries(dataset: DatasetName, variable: string, lon: n
     const m = ds.maps as { url: string; group: string; variables: Record<string, { name: string }> };
     const g = await openIcechunkGroup(m.url, m.group);
     values = await dailyPoint(g, `${m.url}|${m.group}`, m.variables[variable]!.name, lon, lat, start, end);
-    source = "PRISM mirror (32-day chunks)";
+    source = "PRISM mirror (one-day chunks in 32-day shards)";
   }
   return { dataset, dates, values, source };
 }

@@ -1,7 +1,7 @@
 source,location,task,var,array_chunks,values,chunks_read,mb_fetched,mb_decoded,open_s,read_s_median,read_s_min,repeats
-PRISM daily (our mirror),local,map (one time step),ppt,32x256x256,21812625,364,225.7,3053,0.007582,0.329,0.3012,3
-PRISM daily (our mirror),local,series 2021,ppt,32x256x256,365,12,5.765,100.7,0.007553,0.01527,0.01507,3
-PRISM daily (our mirror),local,series full record,ppt,32x256x256,16741,524,6.786,4396,0.007605,0.03364,0.03353,3
+PRISM daily (our mirror),local,map (one time step),ppt,1x256x256,21812625,364,6.863,95.42,0.01077,0.05642,0.05487,3
+PRISM daily (our mirror),local,series 2021,ppt,1x256x256,365,365,4.864,95.68,0.0104,0.03358,0.03357,3
+PRISM daily (our mirror),local,series full record,ppt,1x256x256,16741,16741,6.108,4389,0.01075,0.1117,0.1038,3
 CHIRPS pentads (our native mirror),local,map (one time step),precip,18x400x400,17280000,108,156.1,1244,0.0009562,0.2219,0.1946,3
 CHIRPS pentads (our native mirror),local,series 2021,precip,18x400x400,72,4,15.93,46.08,0.004478,0.02521,0.025,3
 CHIRPS pentads (our native mirror),local,series full record,precip,18x400x400,3294,183,37.2,2108,0.004479,0.05693,0.05479,3

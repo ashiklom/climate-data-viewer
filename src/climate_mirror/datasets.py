@@ -62,4 +62,4 @@ def sample_dates(ds: Dataset, freq: Frequency) -> pd.DatetimeIndex:
 
 
 def default_layout(freq: Frequency) -> str:
-    return f"{freq.time_chunk}x{freq.space_chunk}x{freq.space_chunk}"
+    return freq.layout_name()
