@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 
-from climate_mirror import chirps, era5, era5land, storage
+from climate_mirror import chirps, era5, era5land, gridmet, nldas, storage
 from climate_mirror.paths import REPO_ROOT
 from climate_mirror.variables import CANONICAL
 from climate_mirror.web.daily_sources import DAY_WINDOW, MERRA2_CROSSWALK, PRISM_CROSSWALK
@@ -82,7 +82,22 @@ def main() -> None:
             "series": {"kind": "zarr2", "url": ext("imerg_power")["temporal_url"], "consolidated": True,
                        "variables": {"pr": {"name": "IMERG_PRECTOT"}}, "time": "time"},
         },
+        "gridmet": {
+            "label": "gridMET 4km (CONUS)",
+            "maps": {"kind": "icechunk", "url": mirror_url("gridmet"), "group": "daily", "cf": True,
+                     "variables": identity(gridmet.CANONICAL_VARS)},
+            "series": "maps",
+            "series_note": "gridMET mirror (one-day tiles in 32-day shards)",
+        },
+        "nldas": {
+            "label": "NLDAS-2 0.125° (CONUS)",
+            "maps": {"kind": "icechunk", "url": mirror_url("nldas"), "group": "daily",
+                     "variables": identity(nldas.CANONICAL_VARS)},
+            "series": "maps",
+            "series_note": "NLDAS-2 mirror, daily from hourly (one-day tiles in 32-day shards)",
+        },
     }
+    datasets["prism"]["series_note"] = "PRISM mirror (one-day chunks in 32-day shards)"
     for name, d in datasets.items():
         d["day_window"] = DAY_WINDOW[name]
         d["common"] = {"kind": "icechunk", "url": mirror_url(name), "group": COMMON}

@@ -14,7 +14,7 @@ import xarray as xr
 
 from climate_mirror import storage
 
-DATASETS = ["prism", "chirps", "era5", "era5land", "merra2", "imerg"]
+DATASETS = ["prism", "chirps", "era5", "era5land", "merra2", "imerg", "gridmet", "nldas"]
 
 DAY_WINDOW = {
     "prism": "24 h ending 12:00 UTC on the labelled date",
@@ -23,6 +23,8 @@ DAY_WINDOW = {
     "era5land": "UTC day (00-24 UTC)",
     "merra2": "UTC day (NASA POWER, MERRA-2)",
     "imerg": "UTC day (NASA POWER, IMERG Final)",
+    "gridmet": "calendar day ending at midnight MST (07 UTC the next day)",
+    "nldas": "UTC day (00-24 UTC; precipitation is CPC daily gauge analysis, 12-12 UTC, split into hours)",
 }
 
 PRISM_CROSSWALK = {"pr": "ppt", "tas": "tmean", "tasmax": "tmax", "tasmin": "tmin", "tdps": "tdmean", "rsds": "soltotal"}
@@ -77,7 +79,19 @@ def imerg(start: dt.date, end: dt.date) -> xr.Dataset:
     return _power("imerg_power", {"pr": "IMERG_PRECTOT"}, start, end)
 
 
-READERS = {"prism": prism, "chirps": chirps, "era5": era5, "era5land": era5land, "merra2": merra2, "imerg": imerg}
+def gridmet(start: dt.date, end: dt.date) -> xr.Dataset:
+    """Our gridMET mirror (scripts/gridmet/build_store.py): canonical variables, CF-decoded to float32."""
+    repo = storage.open_mirror("gridmet")
+    ds = xr.open_zarr(repo.readonly_session("main").store, group="daily", consolidated=False, chunks=None)
+    return _sel(ds.drop_vars("time_bnds"), start, end).astype(np.float32)
+
+
+def nldas(start: dt.date, end: dt.date) -> xr.Dataset:
+    """Daily canonical variables derived from our NLDAS-2 hourly mirror (scripts/nldas/derive_daily.py)."""
+    return _sel(_mirror_group("nldas", "daily").drop_vars("time_bnds"), start, end)
+
+
+READERS = {"prism": prism, "chirps": chirps, "era5": era5, "era5land": era5land, "merra2": merra2, "imerg": imerg, "gridmet": gridmet, "nldas": nldas}
 
 
 def open_daily(name: str, start: dt.date, end: dt.date) -> xr.Dataset:

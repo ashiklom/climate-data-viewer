@@ -1,5 +1,5 @@
 // Daily point time series per dataset, read from the most time-friendly copy of each dataset:
-//   PRISM: our mirror (32-day chunks); CHIRPS: dynamical.org (365-day chunks); ERA5: Earthmover single/temporal
+//   PRISM, gridMET, NLDAS-2 (and other "series": "maps" datasets): our mirrors (one-day tiles in 32-day shards); CHIRPS: dynamical.org (365-day chunks); ERA5: Earthmover single/temporal
 //   (hourly, one ~year per chunk; aggregated to UTC days here with the same rules as climate_mirror.era5);
 //   MERRA-2 / IMERG: NASA POWER temporal stores; ERA5-Land: ECMWF ARCO geo-chunked stores (hourly, CDS key).
 import * as zarr from "zarrita";
@@ -130,7 +130,7 @@ export async function pointSeries(dataset: DatasetName, variable: string, lon: n
     const m = ds.maps as { url: string; group: string; variables: Record<string, { name: string }> };
     const g = await openIcechunkGroup(m.url, m.group);
     values = await dailyPoint(g, `${m.url}|${m.group}`, m.variables[variable]!.name, lon, lat, start, end);
-    source = "PRISM mirror (one-day chunks in 32-day shards)";
+    source = (ds as { series_note?: string }).series_note ?? `${dataset} mirror`;
   }
   return { dataset, dates, values, source };
 }

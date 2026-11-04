@@ -168,6 +168,7 @@
     }
    },
    "series": "maps",
+   "series_note": "PRISM mirror (one-day chunks in 32-day shards)",
    "day_window": "24 h ending 12:00 UTC on the labelled date",
    "common": {
     "kind": "icechunk",
@@ -530,6 +531,131 @@
    ],
    "series_variables": [
     "pr"
+   ]
+  },
+  "gridmet": {
+   "label": "gridMET 4km (CONUS)",
+   "maps": {
+    "kind": "icechunk",
+    "url": "/data/gridmet.icechunk",
+    "group": "daily",
+    "cf": true,
+    "variables": {
+     "pr": {
+      "name": "pr"
+     },
+     "tasmax": {
+      "name": "tasmax"
+     },
+     "tasmin": {
+      "name": "tasmin"
+     },
+     "rsds": {
+      "name": "rsds"
+     },
+     "sfcWind": {
+      "name": "sfcWind"
+     },
+     "tas": {
+      "name": "tas"
+     }
+    }
+   },
+   "series": "maps",
+   "series_note": "gridMET mirror (one-day tiles in 32-day shards)",
+   "day_window": "calendar day ending at midnight MST (07 UTC the next day)",
+   "common": {
+    "kind": "icechunk",
+    "url": "/data/gridmet.icechunk",
+    "group": "common_0p25/daily"
+   },
+   "variables": [
+    "pr",
+    "rsds",
+    "sfcWind",
+    "tas",
+    "tasmax",
+    "tasmin"
+   ],
+   "series_variables": [
+    "pr",
+    "rsds",
+    "sfcWind",
+    "tas",
+    "tasmax",
+    "tasmin"
+   ]
+  },
+  "nldas": {
+   "label": "NLDAS-2 0.125\u00b0 (CONUS)",
+   "maps": {
+    "kind": "icechunk",
+    "url": "/data/nldas.icechunk",
+    "group": "daily",
+    "variables": {
+     "pr": {
+      "name": "pr"
+     },
+     "tas": {
+      "name": "tas"
+     },
+     "tasmax": {
+      "name": "tasmax"
+     },
+     "tasmin": {
+      "name": "tasmin"
+     },
+     "tdps": {
+      "name": "tdps"
+     },
+     "ps": {
+      "name": "ps"
+     },
+     "rsds": {
+      "name": "rsds"
+     },
+     "sfcWind": {
+      "name": "sfcWind"
+     },
+     "sm1": {
+      "name": "sm1"
+     },
+     "sm2": {
+      "name": "sm2"
+     }
+    }
+   },
+   "series": "maps",
+   "series_note": "NLDAS-2 mirror, daily from hourly (one-day tiles in 32-day shards)",
+   "day_window": "UTC day (00-24 UTC; precipitation is CPC daily gauge analysis, 12-12 UTC, split into hours)",
+   "common": {
+    "kind": "icechunk",
+    "url": "/data/nldas.icechunk",
+    "group": "common_0p25/daily"
+   },
+   "variables": [
+    "pr",
+    "ps",
+    "rsds",
+    "sfcWind",
+    "sm1",
+    "sm2",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
+   ],
+   "series_variables": [
+    "pr",
+    "ps",
+    "rsds",
+    "sfcWind",
+    "sm1",
+    "sm2",
+    "tas",
+    "tasmax",
+    "tasmin",
+    "tdps"
    ]
   }
  }
