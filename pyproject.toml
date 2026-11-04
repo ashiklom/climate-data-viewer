@@ -21,6 +21,7 @@ dependencies = [
     "rasterio>=1.5.2",
     "requests>=2.34.2",
     "rioxarray>=0.24.0",
+    "shapely>=2.2.0",
     "tqdm>=4.70.1",
     "xarray>=2026.9.0",
     "xarray-regrid>=0.4.2",

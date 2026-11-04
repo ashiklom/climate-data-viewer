@@ -18,7 +18,24 @@
   const DATASETS = Object.keys(sources.datasets) as DatasetName[];
   const VARIABLES = Object.keys(sources.canonical);
   const [PERIOD_START, PERIOD_END] = sources.prototype_period;
-  const BASEMAP = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+  // OpenStreetMap raster tiles (tile.openstreetmap.org: fine for a local prototype; a public site needs its own
+  // tile provider per the OSM tile usage policy).
+  const BASEMAP: maplibregl.StyleSpecification = {
+    version: 8,
+    sources: {
+      osm: {
+        type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 19,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      },
+    },
+    layers: [{ id: "osm", type: "raster", source: "osm" }],
+  };
+  // Natural Earth 1:10m lines (scripts/web/make_overlays.py), drawn above the data layer.
+  const OVERLAYS = [
+    { id: "coastline", label: "Coastlines", color: "#1d3557", width: 0.9 },
+    { id: "countries", label: "National borders", color: "#111", width: 1.1 },
+    { id: "states", label: "US state borders", color: "#444", width: 0.7 },
+  ] as const;
   const COLORS = ["#4269d0", "#efb118", "#ff725c", "#6cc5b0", "#3ca951", "#a463f2"];
 
   type Mode = "native" | "diff" | "ratio";
@@ -33,6 +50,8 @@
   let seriesStatus = $state("");
   let boxMeans = $state<BoxMean[]>([]);
   let sharedCells = $state(0);
+  let transparency = $state(0); // percent; 0 = opaque data layer
+  let overlaysOn = $state<Record<string, boolean>>({ coastline: true, countries: true, states: true });
 
   let mapEl: HTMLDivElement;
   let chartEl: HTMLDivElement;
@@ -41,6 +60,7 @@
   let overlay: MapboxOverlay;
   let colormapImage: ImageData;
   let colormapTexture: Texture | null = null;
+  let dataLayer: ReturnType<typeof makeLayer> | null = null;
 
   const available = $derived(DATASETS.filter((d) => (sources.datasets[d].variables as string[]).includes(variable)));
   const canonical = $derived(sources.canonical[variable as keyof typeof sources.canonical]);
@@ -93,11 +113,16 @@
         const [a, b] = await Promise.all([commonSource(datasetA, variable, date), commonSource(datasetB, variable, date)]);
         layer = makeLayer(id, a, s, colormapTexture, { b, op: mode, onLoad });
       }
-      if (token === renderToken) overlay.setProps({ layers: [layer] });
+      if (token === renderToken) { dataLayer = layer; showDataLayer(); }
     } catch (e) {
       status = `error: ${e instanceof Error ? e.message : e}`;
       console.error(e);
     }
+  }
+
+  function showDataLayer() {
+    // below the overlay lines; opacity changes keep the layer (and its loaded tiles)
+    if (overlay && dataLayer) overlay.setProps({ layers: [dataLayer.clone({ opacity: 1 - transparency / 100, beforeId: `overlay-${OVERLAYS[0].id}` } as never)] });
   }
 
   async function loadSeries(lon: number, lat: number) {
@@ -130,6 +155,17 @@
     }));
   }
 
+  function addOverlays() {
+    for (const o of OVERLAYS) {
+      map.addSource(`overlay-${o.id}`, { type: "geojson", data: `${import.meta.env.BASE_URL}overlays/${o.id}.geojson` });
+      map.addLayer({
+        id: `overlay-${o.id}`, type: "line", source: `overlay-${o.id}`,
+        layout: { visibility: overlaysOn[o.id] ? "visible" : "none", "line-join": "round" },
+        paint: { "line-color": o.color, "line-width": o.width, "line-opacity": 0.85 },
+      });
+    }
+  }
+
   const fmt = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : "—");
 
   async function meansOverView() {
@@ -145,6 +181,7 @@
     map.on("load", async () => {
       overlay = new MapboxOverlay({ interleaved: true, layers: [] });
       map.addControl(overlay);
+      addOverlays();
       const bytes = new Uint8Array(await (await fetch(colormapsPng)).arrayBuffer());
       colormapImage = await decodeColormapSprite(bytes);
       const device = await new Promise<Device>((resolve) => {
@@ -164,6 +201,15 @@
     // re-render when any map control changes
     void [variable, date, mode, datasetA, datasetB];
     updateLayer();
+  });
+  $effect(() => {
+    void transparency;
+    untrack(showDataLayer);
+  });
+  $effect(() => {
+    const on = { ...overlaysOn };
+    if (!map?.loaded()) return;
+    for (const o of OVERLAYS) if (map.getLayer(`overlay-${o.id}`)) map.setLayoutProperty(`overlay-${o.id}`, "visibility", on[o.id] ? "visible" : "none");
   });
   $effect(() => {
     // reload series when the variable changes; `point` is read untracked because loadSeries assigns it
@@ -209,6 +255,14 @@
       <div class="ticks"><span>{style().clim[0]}</span><span>{mode === "ratio" ? "log₂(A/B)" : canonical.units}</span><span>{style().clim[1]}</span></div>
     </div>
     <p class="status">{status}</p>
+
+    <label>Data layer transparency: {transparency}%
+      <input type="range" min="0" max="100" step="5" bind:value={transparency} />
+    </label>
+    <fieldset>
+      <legend>Overlays</legend>
+      {#each OVERLAYS as o}<label><input type="checkbox" bind:checked={overlaysOn[o.id]} /> {o.label}</label>{/each}
+    </fieldset>
 
     <button onclick={meansOverView}>Area means over current view</button>
     {#if boxMeans.length}
