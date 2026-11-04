@@ -8,7 +8,7 @@ quantum; how many and by how much is recorded in results/nldas/hourly_packing.cs
 pcodec. -9999 -> missing. The hourly
 axis covers the full record; unwritten hours read as missing.
 
-    uv run python scripts/nldas/mirror_hourly.py --start 2021-01-01 --end 2022-01-01
+    uv run python scripts/nldas/mirror_hourly.py --start 2021-01-01 --end 2021-12-31   # also mirrors 2022-01-01
 """
 
 from __future__ import annotations
@@ -182,7 +182,8 @@ def main() -> None:
     repo = storage.open_mirror("nldas", create=True)
     t_axis0 = pd.Timestamp(nldas.RECORD[0])
 
-    days = [d.date() for d in pd.date_range(args.start, args.end, freq="D")]
+    # plus the day after --end: daily sums for the last day need its 00 UTC hour
+    days = [d.date() for d in pd.date_range(args.start, args.end + dt.timedelta(days=1), freq="D")]
     # skip days already written (resumable)
     try:
         g = zarr.open_group(repo.readonly_session("main").store, path=GROUP, mode="r")

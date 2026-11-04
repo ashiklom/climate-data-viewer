@@ -98,6 +98,25 @@ era5land-daily start=start end=end:
     {{py}} scripts/era5land/fetch_cds.py --start {{replace_regex(start, '-[0-9]+$', '')}} --end {{replace_regex(end, '-[0-9]+$', '')}}
     {{py}} scripts/era5land/derive_daily.py --start {{replace_regex(start, '-[0-9]+$', '')}} --end {{replace_regex(end, '-[0-9]+$', '')}}
 
+# ---- gridMET, NLDAS-2, Daymet (docs/gridmet-nldas-daymet.md) ---------------------------------------------------
+
+# gridMET: download NKN yearly files, write them into the mirror, verify against the files
+gridmet year="2021":
+    {{py}} scripts/gridmet/download.py --years {{year}}
+    {{py}} scripts/gridmet/build_store.py --years {{year}}
+    {{py}} scripts/gridmet/verify_store.py --years {{year}}
+
+# NLDAS-2: mirror hourly data (Earthdata login; resumable), derive UTC-day variables, verify against Giovanni
+nldas start=start end=end:
+    {{py}} scripts/nldas/mirror_hourly.py --start {{start}} --end {{end}}
+    {{py}} scripts/nldas/derive_daily.py --start {{start}} --end {{end}}
+    {{py}} scripts/nldas/verify.py --year {{replace_regex(start, '-.*$', '')}}
+
+# Daymet: mirror the CONUS window of one year (Earthdata login; resumable), verify against the single-pixel API
+daymet year="2021":
+    {{py}} scripts/daymet/mirror.py --year {{year}}
+    {{py}} scripts/daymet/verify_store.py --year {{year}}
+
 # ---- Studies ---------------------------------------------------------------------------------------------------
 
 # Codec (or with --layouts, chunk layout) experiments for one dataset

@@ -24,8 +24,17 @@ $PY scripts/era5land/derive_pr_arco.py --start "$START" --end "$END"
 $PY scripts/era5land/fetch_cds.py --start "${START:0:7}" --end "${END:0:7}"
 $PY scripts/era5land/derive_daily.py --start "${START:0:7}" --end "${END:0:7}"
 
+# gridMET, NLDAS-2 (Earthdata login), Daymet (Earthdata login): see docs/gridmet-nldas-daymet.md.
+for y in $(seq "${START:0:4}" "${END:0:4}"); do
+  $PY scripts/gridmet/download.py --years "$y"
+  $PY scripts/gridmet/build_store.py --years "$y"
+  $PY scripts/daymet/mirror.py --year "$y"
+done
+$PY scripts/nldas/mirror_hourly.py --start "$START" --end "$END"
+$PY scripts/nldas/derive_daily.py --start "$START" --end "$END"
+
 # Common 0.25 degree grid for every dataset (MERRA-2 and IMERG are read from NASA POWER).
-for ds in prism chirps era5 era5land merra2 imerg; do
+for ds in prism chirps era5 era5land merra2 imerg gridmet nldas daymet; do
   $PY scripts/web/regrid_common.py --dataset "$ds" --start "$START" --end "$END"
 done
 

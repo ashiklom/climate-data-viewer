@@ -1,7 +1,7 @@
 # climate-data-mirror
 
 Cloud-native ([Icechunk](https://icechunk.io)) mirrors of climate datasets, with sizing and compression studies, and a
-local website comparing daily PRISM, CHIRPS, ERA5, ERA5-Land, MERRA-2 and IMERG data.
+local website comparing daily PRISM, CHIRPS, ERA5, ERA5-Land, MERRA-2, IMERG, gridMET, NLDAS-2 and Daymet data.
 
 | Dataset | What we hold | Docs |
 |---|---|---|
@@ -10,6 +10,9 @@ local website comparing daily PRISM, CHIRPS, ERA5, ERA5-Land, MERRA-2 and IMERG 
 | ERA5 (0.25°) | Daily canonical variables derived from Earthmover's public hourly ERA5 | `climate_mirror/era5` |
 | ERA5-Land (0.1°) | Daily maps: precipitation from the ECMWF ARCO Zarr stores (hourly sums); other variables from CDS daily statistics (24× less transfer than hourly ARCO tiles). Point series read ARCO geo-chunked stores directly | `climate_mirror/era5land` |
 | MERRA-2, IMERG | Read directly from NASA POWER; we keep only common-grid copies | `climate_mirror/web` |
+| gridMET (4 km CONUS) | Lossless mirror of the NKN yearly NetCDF files (2021 written, 487 MB) | [docs/gridmet-nldas-daymet.md](docs/gridmet-nldas-daymet.md) |
+| NLDAS-2 (0.125° CONUS) | Hourly mirror of all forcing variables + Noah soil moisture from Earthdata Cloud (2021: 6.9 GB), and daily canonical variables | [docs/gridmet-nldas-daymet.md](docs/gridmet-nldas-daymet.md) |
+| Daymet V4R1 (1 km) | Mirror of the CONUS window on the native North America LCC grid (2021), fetched by byte range from ORNL | [docs/gridmet-nldas-daymet.md](docs/gridmet-nldas-daymet.md) |
 
 All datasets also have `common_0p25/daily`: a conservative regrid onto the ERA5 0.25° grid, used for A − B maps and
 area means.
@@ -32,7 +35,8 @@ area means.
 - **`site/`:** the comparison website (Vite + Svelte + deck.gl-zarr). See [docs/website-stack.md](docs/website-stack.md).
 - **`cache/<host>/<path>`:** the permanent cache of raw source files (gitignored).
 - **`data/`:** rebuildable stores and logs (gitignored).
-- **`_credentials.toml`:** local keys (CDS API key, NASA Earthdata), gitignored and never logged.
+- **`_credentials.toml`:** local keys (CDS API key, NASA Earthdata login for NLDAS-2 and Daymet), gitignored and
+  never logged.
 
 ## Website (local prototype)
 
