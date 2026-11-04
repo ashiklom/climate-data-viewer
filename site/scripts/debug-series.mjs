@@ -5,7 +5,7 @@ const browser = await chromium.launch({ channel: "chrome", headless: true, args:
 for (const ds of only ? only.split(",") : ["prism", "chirps", "era5", "era5land", "merra2", "imerg"]) {
   const page = await browser.newPage();
   page.on("crash", () => console.log(`  ${ds}: PAGE CRASHED`));
-  await page.goto("http://localhost:5173/");
+  await page.goto((process.env.SITE ?? "http://localhost:5173") + "/");
   await page.waitForFunction(() => window.__pointSeries, null, { timeout: 60000 });
   try {
     const r = await page.evaluate(async ([d, v, x, y]) => {

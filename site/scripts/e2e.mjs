@@ -30,7 +30,7 @@ async function step(name, fn) {
 }
 const status = () => page.locator(".status").textContent();
 
-await page.goto("http://localhost:5173/");
+await page.goto((process.env.SITE ?? "http://localhost:5173") + "/");
 await step("native-era5-pr", async () => `${await waitText(".status", /loaded in|error/)} s; ${await status()}`);
 
 await step("series-new-haven", async () => {
@@ -39,6 +39,29 @@ await step("series-new-haven", async () => {
   await page.mouse.click(box.x + xy.x, box.y + xy.y);
   await waitText(".series h2 small", /series in/);
   return await page.locator(".series h2 small").textContent();
+});
+
+await step("chart-hover-and-pick", async () => {
+  const c = await page.locator(".chart canvas").first().boundingBox();
+  await page.mouse.move(c.x + c.width * 0.5, c.y + c.height * 0.45);
+  await page.waitForTimeout(300);
+  const tip = (await page.evaluate(() => [...document.querySelectorAll(".chart div")].map((d) => d.innerText).find((t) => /mm day-1/.test(t)) ?? "")).replace(/\s+/g, " ");
+  if (!/mm day-1/.test(tip)) throw new Error("no hover tooltip");
+  await page.mouse.click(c.x + c.width * 0.5, c.y + c.height * 0.45);
+  const picked = await page.locator('input[type="date"]').inputValue();
+  if (!tip.startsWith(picked)) throw new Error(`clicked day ${picked} is not the hovered day`);
+  await waitText(".status", /loaded in|error/);
+  await page.mouse.wheel(0, -400); // zoom in on the chart
+  return `tooltip: ${tip.slice(0, 120)}; picked ${picked}`;
+});
+
+await step("transparency-and-overlays", async () => {
+  await page.locator('input[type="range"]').nth(1).fill("50");
+  await page.locator('input[type="checkbox"]').nth(0).uncheck();
+  const vis = await page.evaluate(() => ["coastline", "countries", "states"].map((id) => window.__map.getLayoutProperty(`overlay-${id}`, "visibility")));
+  if (vis.join() !== "none,visible,visible") throw new Error(`overlay visibility ${vis}`);
+  await page.locator('input[type="checkbox"]').nth(0).check();
+  return `overlays ${vis.join("/")}`;
 });
 
 await step("diff-era5-minus-merra2", async () => {

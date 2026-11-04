@@ -16,7 +16,7 @@ async function fresh() {
     const len = Number(r.headers()["content-length"] ?? 0);
     if (r.url().includes("/data/") || !r.url().startsWith("http://localhost")) { bytes += len; requests += 1; }
   });
-  await page.goto("http://localhost:5173/");
+  await page.goto((process.env.SITE ?? "http://localhost:5173") + "/");
   await page.waitForFunction(() => /loaded in|error/.test(document.querySelector(".status")?.textContent ?? ""), null, { timeout: 120000 });
   return { ctx, page, net: () => ({ bytes, requests }), reset: () => { bytes = 0; requests = 0; } };
 }

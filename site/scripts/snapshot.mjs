@@ -9,7 +9,7 @@ const page = await browser.newPage({ viewport: { width: 1200, height: 1300 }, de
 const lines = [];
 page.on("console", (m) => lines.push(`[${m.type()}] ${m.text()}`));
 page.on("pageerror", (e) => lines.push(`[pageerror] ${e.message}`));
-await page.goto(`http://localhost:5173${path}`);
+await page.goto(`${process.env.SITE ?? "http://localhost:5173"}${path}`);
 const t0 = Date.now();
 const re = done ? new RegExp(done) : null;
 while (Date.now() - t0 < Number(waitMs)) {
