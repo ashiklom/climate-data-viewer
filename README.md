@@ -17,6 +17,9 @@ local website comparing daily PRISM, CHIRPS, ERA5, ERA5-Land, MERRA-2, IMERG, gr
 All datasets also have `common_0p25/daily`: a conservative regrid onto the ERA5 0.25° grid, used for A − B maps and
 area means.
 
+[docs/data-volumes.md](docs/data-volumes.md) compares source archive sizes (all variables, and only the site's
+variables) with our compressed stores, extrapolated to each dataset's full record.
+
 ## Layout
 
 - **`src/climate_mirror/`:**
